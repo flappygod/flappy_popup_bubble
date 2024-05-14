@@ -1,8 +1,8 @@
-TODO: This packages is used to show a bubble item 
+TODO: This packages is used to show a bubble item or bubble popup menu easy.You can show the popup menu where you long touched smoothly.
 
 ## Features
 
-1.bubble items with border radius and a delta indicate。
+1.Bubble items with border radius and a delta indicate。
 2.Long press to show a bubble menu as a overlay.
 
 ## Getting started

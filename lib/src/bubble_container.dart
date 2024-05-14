@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'BubblePainter.dart';
+import 'bubble_painter.dart';
 
 class BubbleContainer extends StatelessWidget {
   ///padding

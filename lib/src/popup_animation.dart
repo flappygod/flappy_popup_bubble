@@ -20,7 +20,7 @@ class PopupMenuController {
 }
 
 ///pop feed animation alpha
-class PopupFeedAnimation extends StatefulWidget {
+class PopupAnimation extends StatefulWidget {
   //controller
   final PopupMenuController controller;
 
@@ -33,7 +33,7 @@ class PopupFeedAnimation extends StatefulWidget {
   //child
   final Widget? child;
 
-  const PopupFeedAnimation({
+  const PopupAnimation({
     super.key,
     required this.controller,
     this.onShow,
@@ -42,11 +42,11 @@ class PopupFeedAnimation extends StatefulWidget {
   });
 
   @override
-  State createState() => _PopupFeedAnimationState();
+  State createState() => _PopupAnimationState();
 }
 
 ///pop feed animation alpha state
-class _PopupFeedAnimationState extends State<PopupFeedAnimation>
+class _PopupAnimationState extends State<PopupAnimation>
     with SingleTickerProviderStateMixin {
   ///animation
   late Animation<double> _animation;

@@ -1,7 +1,7 @@
 library flappy_popup_bubble;
 
-export 'src/PopupFeedAnimation.dart';
-export 'src/BubbleContainer.dart';
-export 'src/BubblePainter.dart';
-export 'src/PopupMenuItem.dart';
-export 'src/PopupMenu.dart';
+export 'src/popup_animation.dart';
+export 'src/bubble_container.dart';
+export 'src/bubble_painter.dart';
+export 'src/popup_menu_item.dart';
+export 'src/popup_menu.dart';

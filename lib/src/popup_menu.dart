@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'PopupFeedAnimation.dart';
-import 'BubbleContainer.dart';
-import 'BubblePainter.dart';
+import 'popup_animation.dart';
+import 'bubble_container.dart';
+import 'bubble_painter.dart';
 
 ///build menu
 typedef PopupMenuBuilder = List<Widget> Function(
@@ -184,7 +184,7 @@ class _PopupMenuState extends State<PopupMenu> {
             Positioned(
               left: posLimit.dx,
               top: posLimit.dy,
-              child: PopupFeedAnimation(
+              child: PopupAnimation(
                 controller: _controller,
                 onHide: () {
                   ///remove overlay

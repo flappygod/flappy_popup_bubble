@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-
 ///pop feed animation alpha controller
 class PopupMenuController {
   AnimationController? _animationController;
@@ -19,7 +18,6 @@ class PopupMenuController {
     _animationController?.reverse();
   }
 }
-
 
 ///pop feed animation alpha
 class PopupFeedAnimation extends StatefulWidget {
@@ -48,7 +46,8 @@ class PopupFeedAnimation extends StatefulWidget {
 }
 
 ///pop feed animation alpha state
-class _PopupFeedAnimationState extends State<PopupFeedAnimation> with SingleTickerProviderStateMixin {
+class _PopupFeedAnimationState extends State<PopupFeedAnimation>
+    with SingleTickerProviderStateMixin {
   ///animation
   late Animation<double> _animation;
 
@@ -66,17 +65,18 @@ class _PopupFeedAnimationState extends State<PopupFeedAnimation> with SingleTick
     widget.controller._setAnimationController(animationController);
 
     ///animation
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(animationController)
-      ..addListener(() {
-        setState(() {});
-      })
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          widget.onShow?.call();
-        } else if (status == AnimationStatus.dismissed) {
-          widget.onHide?.call();
-        }
-      });
+    _animation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(animationController)
+          ..addListener(() {
+            setState(() {});
+          })
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed) {
+              widget.onShow?.call();
+            } else if (status == AnimationStatus.dismissed) {
+              widget.onHide?.call();
+            }
+          });
 
     ///Start the animation to show the widget
     animationController.forward();

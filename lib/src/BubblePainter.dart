@@ -66,10 +66,13 @@ class BubblePainter extends CustomPainter {
         ///draw delta
         Path path = Path()..moveTo(0, offsetTrue);
         path.lineTo(0, offsetTrue + deltaLength);
-        path.lineTo(0 - deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
-        double radius = (deltaCorner / 2) / cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
+        path.lineTo(
+            0 - deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
+        double radius = (deltaCorner / 2) /
+            cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
         path.arcToPoint(
-          Offset(0 - deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
+          Offset(
+              0 - deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(radius),
           clockwise: true,
         );
@@ -82,8 +85,10 @@ class BubblePainter extends CustomPainter {
         ///draw delta
         Path path = Path()..moveTo(offsetTrue, 0);
         path.lineTo(offsetTrue + deltaLength, 0);
-        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
-        double radius = (deltaCorner / 2) / cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
+        path.lineTo(
+            offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
+        double radius = (deltaCorner / 2) /
+            cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
         path.arcToPoint(
           Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, -deltaHeight),
           radius: Radius.circular(radius),
@@ -98,10 +103,13 @@ class BubblePainter extends CustomPainter {
         ///draw delta
         Path path = Path()..moveTo(size.width, offsetTrue);
         path.lineTo(size.width, offsetTrue + deltaLength);
-        path.lineTo(size.width + deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
-        double radius = (deltaCorner / 2) / cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
+        path.lineTo(size.width + deltaHeight,
+            offsetTrue + deltaLength / 2 + deltaCorner / 2);
+        double radius = (deltaCorner / 2) /
+            cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
         path.arcToPoint(
-          Offset(size.width + deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
+          Offset(size.width + deltaHeight,
+              offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(radius),
           clockwise: false,
         );
@@ -114,10 +122,13 @@ class BubblePainter extends CustomPainter {
         ///draw delta
         Path path = Path()..moveTo(offsetTrue, size.height);
         path.lineTo(offsetTrue + deltaLength, size.height);
-        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
-        double radius = (deltaCorner / 2) / cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
+        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2,
+            size.height + deltaHeight);
+        double radius = (deltaCorner / 2) /
+            cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
         path.arcToPoint(
-          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, size.height + deltaHeight),
+          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2,
+              size.height + deltaHeight),
           radius: Radius.circular(radius),
           clockwise: true,
         );

@@ -1,6 +1,6 @@
 name: flappy_popup_bubble
 description: "This packages is used to show a bubble item or bubble popup menu easy.You can show the popup menu where you long touched smoothly."
-version: 0.0.1
+version: 1.0.0
 homepage: https://github.com/flappygod/flappy_popup_bubble
 
 environment:

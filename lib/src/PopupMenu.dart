@@ -4,7 +4,8 @@ import 'BubbleContainer.dart';
 import 'BubblePainter.dart';
 
 ///build menu
-typedef PopupMenuBuilder = List<Widget> Function(BuildContext context, PopupMenuController controller);
+typedef PopupMenuBuilder = List<Widget> Function(
+    BuildContext context, PopupMenuController controller);
 
 ///add popup menu
 class PopupMenu extends StatefulWidget {
@@ -93,7 +94,8 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build Separators
-  List<Widget> createListWithSeparators(List<Widget> originalList, Widget separator) {
+  List<Widget> createListWithSeparators(
+      List<Widget> originalList, Widget separator) {
     List<Widget> listWithSeparators = [];
     for (int i = 0; i < originalList.length; i++) {
       listWithSeparators.add(originalList[i]);
@@ -107,18 +109,21 @@ class _PopupMenuState extends State<PopupMenu> {
   ///build pop up member
   Widget _buildPopUpMenu(OverlayEntry? overlayEntry) {
     ///get render box
-    RenderBox renderBox = _globalKey.currentContext?.findRenderObject() as RenderBox;
+    RenderBox renderBox =
+        _globalKey.currentContext?.findRenderObject() as RenderBox;
     final offset = renderBox.localToGlobal(Offset.zero);
 
     ///build menus
     List<Widget> menusWidgets = widget.menusBuilder(context, _controller);
 
     ///menus
-    List<Widget> menus = createListWithSeparators(menusWidgets, _buildDivider());
+    List<Widget> menus =
+        createListWithSeparators(menusWidgets, _buildDivider());
 
     ///width and height
     double menuWidth = widget.menuWidth;
-    double menuHeight = (widget.menuHeight + _getDividerHeight()) * menusWidgets.length;
+    double menuHeight =
+        (widget.menuHeight + _getDividerHeight()) * menusWidgets.length;
 
     ///get the container rect
     Rect bigRect = Rect.fromLTWH(
@@ -206,9 +211,11 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build constrain rect
-  Offset constrainRectWithinRect(Rect bigRect, Rect smallRect, Offset smallRectOffset) {
+  Offset constrainRectWithinRect(
+      Rect bigRect, Rect smallRect, Offset smallRectOffset) {
     // 计算小 Rect 右下角的 Offset
-    Offset smallRectBottomRight = smallRectOffset + Offset(smallRect.width, smallRect.height);
+    Offset smallRectBottomRight =
+        smallRectOffset + Offset(smallRect.width, smallRect.height);
 
     // 计算小 Rect 能够移动的最大 Offset
     double maxDx = bigRect.right - smallRect.width;

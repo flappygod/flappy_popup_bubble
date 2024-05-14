@@ -59,21 +59,21 @@ class _MyHomePageState extends State<MyHomePage> {
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
         child: _buildPopMenu(
-            Container(
-              decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(8)),
-              width: 140,
-              height: 50,
-              alignment: Alignment.center,
-              child: const Text(
-                "Long Press",
-                style: TextStyle(color: Colors.white, fontSize: 13),
-              ),
+          Container(
+            decoration: BoxDecoration(
+                color: Colors.blue, borderRadius: BorderRadius.circular(8)),
+            width: 140,
+            height: 50,
+            alignment: Alignment.center,
+            child: const Text(
+              "Long Press",
+              style: TextStyle(color: Colors.white, fontSize: 13),
             ),
+          ),
         ),
       ),
     );
   }
-
 
   ///build pop menu
   Widget _buildPopMenu(Widget child) {
@@ -108,6 +108,4 @@ class _MyHomePageState extends State<MyHomePage> {
       child: child,
     );
   }
-
-
 }

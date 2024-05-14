@@ -42,7 +42,8 @@ class PopupMenuBtn extends StatelessWidget {
             Expanded(
               child: Text(
                 text ?? '',
-                style: textStyle ?? const TextStyle(color: Colors.white, fontSize: 13),
+                style: textStyle ??
+                    const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),
             icon ?? const SizedBox(),

@@ -1,4 +1,4 @@
-## 1.0.1
+## 1.0.2
 
 * TODO: create this project for others to use. which show a bubble popup easy.
-1. Change the dart file name lower_case_with_underscores
+1. Hide the popup when dispose was called.

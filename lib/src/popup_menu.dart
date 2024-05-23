@@ -172,6 +172,11 @@ class _PopupMenuState extends State<PopupMenu> {
     ///delta offset
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
+    ///removed
+    if (offset.dx > bigRect.width) {
+      return const SizedBox();
+    }
+
     ///use material for hole
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

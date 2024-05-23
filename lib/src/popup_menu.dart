@@ -115,8 +115,16 @@ class _PopupMenuState extends State<PopupMenu> {
   ///build pop up member
   Widget _buildPopUpMenu(OverlayEntry? overlayEntry) {
     ///get render box
-    RenderBox renderBox =
-        _globalKey.currentContext?.findRenderObject() as RenderBox;
+    ///get render box
+    RenderBox? renderBox =
+        _globalKey.currentContext?.findRenderObject() as RenderBox?;
+
+    ///context is null
+    if (renderBox == null) {
+      return const SizedBox();
+    }
+
+    ///offset
     final offset = renderBox.localToGlobal(Offset.zero);
 
     ///build menus

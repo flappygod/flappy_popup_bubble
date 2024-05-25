@@ -1,10 +1,10 @@
 name: flappy_popup_bubble
 description: "This packages is used to show a bubble item or bubble popup menu easy.You can show the popup menu where you long touched smoothly."
-version: 1.0.5
+version: 1.0.6
 homepage: https://github.com/flappygod/flappy_popup_bubble
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.2.6 <4.0.0'
   flutter: ">=1.17.0"
 
 dependencies:

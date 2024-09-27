@@ -122,6 +122,8 @@ class _PopupMenuState extends State<PopupMenu> {
   @override
   void initState() {
     _menuController = widget.controller ?? PopupMenuController();
+
+    ///add listener
     _listener = (event) {
       if (event == PopupMenuController._eventHide) {
         _hideOverlay();
@@ -130,10 +132,14 @@ class _PopupMenuState extends State<PopupMenu> {
         _showOverlay();
       }
     };
-    _menuController?.addListener(_listener);
+
+    ///add listener after paint to avoid bugs
     WidgetsBinding.instance.addPostFrameCallback((data) {
-      if (_menuController?._isShowPop ?? false) {
-        _showOverlay();
+      if (mounted) {
+        _menuController?.addListener(_listener);
+        if (_menuController?._isShowPop ?? false) {
+          _showOverlay();
+        }
       }
     });
     super.initState();

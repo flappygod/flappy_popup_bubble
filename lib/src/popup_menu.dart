@@ -156,7 +156,9 @@ class _PopupMenuState extends State<PopupMenu> {
   @override
   void dispose() {
     _menuController?.removeListener(_listener);
-    _animationController.hide();
+    ///remove overlay
+    _currentShowOverlay?.remove();
+    _currentShowOverlay = null;
     super.dispose();
   }
 

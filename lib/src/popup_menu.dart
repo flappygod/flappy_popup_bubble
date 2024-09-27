@@ -63,6 +63,9 @@ class PopupMenu extends StatefulWidget {
   ///menus
   final PopupMenuBuilder menusBuilder;
 
+  final double? offsetDx;
+  final double? offsetDy;
+
   ///translucent
   final bool translucent;
 
@@ -84,6 +87,8 @@ class PopupMenu extends StatefulWidget {
     this.translucent = false,
     this.showOnLongPress = true,
     this.touchToClose = true,
+    this.offsetDx,
+    this.offsetDy,
   });
 
   @override
@@ -305,8 +310,8 @@ class _PopupMenuState extends State<PopupMenu> {
         children: [
           ///use position
           Positioned(
-            left: posLimit.dx,
-            top: posLimit.dy,
+            left: posLimit.dx - (widget.offsetDx ?? 0),
+            top: posLimit.dy - (widget.offsetDy ?? 0),
             child: PopupAnimation(
               controller: _animationController,
               onHide: () {

@@ -14,13 +14,18 @@ class PopupMenuController {
 
   final List<ValueChanged<int>> _listeners = [];
 
+  ///is show pop
+  bool _isShowPop = false;
+
   ///show menu
   void show() {
+    _isShowPop = true;
     notifyListeners(_eventShow);
   }
 
   ///hide menu
   void hide() {
+    _isShowPop = false;
     notifyListeners(_eventHide);
   }
 
@@ -126,6 +131,11 @@ class _PopupMenuState extends State<PopupMenu> {
       }
     };
     _menuController?.addListener(_listener);
+    WidgetsBinding.instance.addPostFrameCallback((data) {
+      if (_menuController?._isShowPop ?? false) {
+        _showOverlay();
+      }
+    });
     super.initState();
   }
 
@@ -156,6 +166,7 @@ class _PopupMenuState extends State<PopupMenu> {
   @override
   void dispose() {
     _menuController?.removeListener(_listener);
+
     ///remove overlay
     _currentShowOverlay?.remove();
     _currentShowOverlay = null;

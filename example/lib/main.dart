@@ -37,6 +37,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final PopupMenuController _controller = PopupMenuController();
+
   @override
   Widget build(BuildContext context) {
     // This method is rerun every time setState is called, for instance as done
@@ -58,18 +60,39 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
-        child: _buildPopMenu(
-          Container(
-            decoration: BoxDecoration(
-                color: Colors.blue, borderRadius: BorderRadius.circular(8)),
-            width: 140,
-            height: 50,
-            alignment: Alignment.center,
-            child: const Text(
-              "Long Press",
-              style: TextStyle(color: Colors.white, fontSize: 13),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildPopMenu(
+              Container(
+                decoration: BoxDecoration(
+                    color: Colors.blue, borderRadius: BorderRadius.circular(8)),
+                width: 140,
+                height: 50,
+                alignment: Alignment.center,
+                child: const Text(
+                  "Long Press",
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 200, 0, 0),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  _controller.hide();
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(8)),
+                  width: 140,
+                  height: 50,
+                ),
+              ),
+            )
+          ],
         ),
       ),
     );
@@ -78,6 +101,10 @@ class _MyHomePageState extends State<MyHomePage> {
   ///build pop menu
   Widget _buildPopMenu(Widget child) {
     return PopupMenu(
+      controller: _controller,
+      showOnLongPress: true,
+      translucent: true,
+      touchToClose: true,
       menusBuilder: (context, controller) {
         return [
           PopupMenuBtn(

@@ -1,36 +1,44 @@
 import 'package:flutter/material.dart';
 
-///pop feed animation alpha controller
-class PopupMenuController {
+/// Pop feed animation alpha controller
+class PopupAnimationController {
   AnimationController? _animationController;
 
-  void _setAnimationController(AnimationController? controller) {
+  bool animation;
+
+  PopupAnimationController({
+    this.animation = false,
+  });
+
+  void setAnimationController(AnimationController? controller) {
     _animationController = controller;
   }
 
   bool get isVisible => _animationController?.isCompleted ?? false;
 
   void show() {
+    animation = true;
     _animationController?.forward();
   }
 
   void hide() {
+    animation = false;
     _animationController?.reverse();
   }
 }
 
-///pop feed animation alpha
+/// Pop feed animation alpha
 class PopupAnimation extends StatefulWidget {
-  //controller
-  final PopupMenuController controller;
+  // Controller
+  final PopupAnimationController controller;
 
-  //on show
+  // On show
   final VoidCallback? onShow;
 
-  //on hide
+  // On hide
   final VoidCallback? onHide;
 
-  //child
+  // Child
   final Widget? child;
 
   const PopupAnimation({
@@ -45,26 +53,26 @@ class PopupAnimation extends StatefulWidget {
   State createState() => _PopupAnimationState();
 }
 
-///pop feed animation alpha state
+/// Pop feed animation alpha state
 class _PopupAnimationState extends State<PopupAnimation>
     with SingleTickerProviderStateMixin {
-  ///animation
+  /// Animation
   late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
 
-    ///Set the animation controller in the widget's controller
+    /// Set the animation controller in the widget's controller
     final AnimationController animationController = AnimationController(
       duration: const Duration(milliseconds: 140),
       vsync: this,
     );
 
-    ///Set the animation controller in the widget's controller
-    widget.controller._setAnimationController(animationController);
+    /// Set the animation controller in the widget's controller
+    widget.controller.setAnimationController(animationController);
 
-    ///animation
+    /// Animation
     _animation =
         Tween<double>(begin: 0.0, end: 1.0).animate(animationController)
           ..addListener(() {
@@ -78,21 +86,26 @@ class _PopupAnimationState extends State<PopupAnimation>
             }
           });
 
-    ///Start the animation to show the widget
-    animationController.forward();
+    /// Start the animation to show the widget
+    if (widget.controller.animation) {
+      animationController.forward();
+    }
   }
 
   @override
   void dispose() {
-    widget.controller._setAnimationController(null);
+    widget.controller._animationController?.dispose();
+    widget.controller.setAnimationController(null);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: _animation.value,
-      child: widget.child,
-    );
+    return _animation.value == 0
+        ? const SizedBox()
+        : Opacity(
+            opacity: _animation.value,
+            child: widget.child ?? const SizedBox(),
+          );
   }
 }

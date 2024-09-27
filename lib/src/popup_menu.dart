@@ -7,8 +7,44 @@ import 'bubble_painter.dart';
 typedef PopupMenuBuilder = List<Widget> Function(
     BuildContext context, PopupMenuController controller);
 
+///pop feed animation alpha controller
+class PopupMenuController {
+  static const int _eventShow = 1;
+  static const int _eventHide = 2;
+
+  final List<ValueChanged<int>> _listeners = [];
+
+  ///show menu
+  void show() {
+    notifyListeners(_eventShow);
+  }
+
+  ///hide menu
+  void hide() {
+    notifyListeners(_eventHide);
+  }
+
+  //notify listener
+  void notifyListeners(int data) {
+    for (ValueChanged<int> item in _listeners) {
+      item(data);
+    }
+  }
+
+  void addListener(ValueChanged<int> listener) {
+    _listeners.add(listener);
+  }
+
+  void removeListener(ValueChanged<int> listener) {
+    _listeners.remove(listener);
+  }
+}
+
 ///add popup menu
 class PopupMenu extends StatefulWidget {
+  ///controller
+  final PopupMenuController? controller;
+
   ///background color
   final Color backgroundColor;
 
@@ -27,14 +63,27 @@ class PopupMenu extends StatefulWidget {
   ///menus
   final PopupMenuBuilder menusBuilder;
 
+  ///translucent
+  final bool translucent;
+
+  ///show on long press
+  final bool showOnLongPress;
+
+  ///touch to close
+  final bool touchToClose;
+
   const PopupMenu({
     super.key,
+    this.controller,
     required this.child,
     required this.menusBuilder,
     this.menuWidth = 120,
     this.menuHeight = 40,
     this.backgroundColor = const Color(0xFF5A5B5E),
     this.dividerColor = Colors.black87,
+    this.translucent = false,
+    this.showOnLongPress = true,
+    this.touchToClose = true,
   });
 
   @override
@@ -44,48 +93,93 @@ class PopupMenu extends StatefulWidget {
 }
 
 class _PopupMenuState extends State<PopupMenu> {
+  ///menu controller
+  PopupMenuController? _menuController;
+
+  ///listener
+  late ValueChanged<int> _listener;
+
   ///controller
-  final PopupMenuController _controller = PopupMenuController();
+  final PopupAnimationController _animationController =
+      PopupAnimationController();
 
   ///global key
   final GlobalKey _globalKey = GlobalKey();
+
+  ///overlay is show or not
+  OverlayEntry? _currentShowOverlay;
+
+  @override
+  void initState() {
+    _menuController = widget.controller ?? PopupMenuController();
+    _listener = (event) {
+      if (event == PopupMenuController._eventHide) {
+        _hideOverlay();
+      }
+      if (event == PopupMenuController._eventShow) {
+        _showOverlay();
+      }
+    };
+    _menuController?.addListener(_listener);
+    super.initState();
+  }
+
+  @override
+  void didUpdateWidget(PopupMenu oldWidget) {
+    if (widget.controller != null && widget.controller != _menuController) {
+      _menuController?.removeListener(_listener);
+      _menuController = widget.controller;
+      _menuController?.addListener(_listener);
+    }
+    super.didUpdateWidget(oldWidget);
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       key: _globalKey,
       behavior: HitTestBehavior.translucent,
-      onLongPress: _showOverlay,
+      onLongPress: () {
+        if (widget.showOnLongPress) {
+          _menuController?.show();
+        }
+      },
       child: widget.child,
     );
   }
 
   @override
   void dispose() {
-    _controller.hide();
+    _menuController?.removeListener(_listener);
+    _animationController.hide();
     super.dispose();
   }
 
   ///show overlay
   void _showOverlay() {
-    ///build overlay
-    final OverlayState overlay = Overlay.of(context);
-
-    ///创建一个 OverlayEntry 对象
-    OverlayEntry? overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        left: 0,
-        top: 0,
-        width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
-        child: _buildPopUpMenu(overlayEntry),
-      ),
-    );
-    overlay.insert(overlayEntry);
+    ///if overlay is not show ,show overlay
+    if (_currentShowOverlay == null) {
+      final OverlayState overlay = Overlay.of(context);
+      _currentShowOverlay = OverlayEntry(
+        builder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          child: _buildPopUpMenu(),
+        ),
+      );
+      overlay.insert(_currentShowOverlay!);
+      _animationController.show();
+    }
   }
 
-  ///divider
+  ///hide overlay
+  void _hideOverlay() {
+    _animationController.hide();
+  }
+
+  ///divider height
   double _getDividerHeight() {
     return 1 / MediaQuery.of(context).devicePixelRatio;
   }
@@ -113,7 +207,23 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build pop up member
-  Widget _buildPopUpMenu(OverlayEntry? overlayEntry) {
+  Widget _buildPopUpMenu() {
+    ///use material for hole
+    return widget.translucent
+        ? _buildContent()
+        : GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              if (widget.touchToClose) {
+                _hideOverlay();
+              }
+            },
+            child: _buildContent(),
+          );
+  }
+
+  ///build content
+  Widget _buildContent() {
     ///get render box
     ///get render box
     RenderBox? renderBox =
@@ -128,7 +238,7 @@ class _PopupMenuState extends State<PopupMenu> {
     final offset = renderBox.localToGlobal(Offset.zero);
 
     ///build menus
-    List<Widget> menusWidgets = widget.menusBuilder(context, _controller);
+    List<Widget> menusWidgets = widget.menusBuilder(context, _menuController!);
 
     ///menus
     List<Widget> menus =
@@ -185,46 +295,40 @@ class _PopupMenuState extends State<PopupMenu> {
       return const SizedBox();
     }
 
-    ///use material for hole
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        _controller.hide();
-      },
-      child: Material(
-        color: Colors.transparent,
-        type: MaterialType.transparency,
+    return Material(
+      color: Colors.transparent,
+      type: MaterialType.transparency,
 
-        ///use stack for the popup
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            ///use position
-            Positioned(
-              left: posLimit.dx,
-              top: posLimit.dy,
-              child: PopupAnimation(
-                controller: _controller,
-                onHide: () {
-                  ///remove overlay
-                  overlayEntry?.remove();
-                },
-                child: BubbleContainer(
-                  width: widget.menuWidth,
-                  type: showDown ? BubbleType.top : BubbleType.bottom,
-                  radius: BorderRadius.circular(8),
-                  deltaOffset: delta,
-                  color: widget.backgroundColor,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: menus,
-                  ),
+      ///use stack for the popup
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ///use position
+          Positioned(
+            left: posLimit.dx,
+            top: posLimit.dy,
+            child: PopupAnimation(
+              controller: _animationController,
+              onHide: () {
+                ///remove overlay
+                _currentShowOverlay?.remove();
+                _currentShowOverlay = null;
+              },
+              child: BubbleContainer(
+                width: widget.menuWidth,
+                type: showDown ? BubbleType.top : BubbleType.bottom,
+                radius: BorderRadius.circular(8),
+                deltaOffset: delta,
+                color: widget.backgroundColor,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: menus,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

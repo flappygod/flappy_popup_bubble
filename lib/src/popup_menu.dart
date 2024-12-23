@@ -152,9 +152,6 @@ class _PopupMenuState extends State<PopupMenu> {
       _menuController = widget.controller;
       _menuController?.addListener(_listener);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _currentShowOverlay?.markNeedsBuild();
-    });
     super.didUpdateWidget(oldWidget);
   }
 

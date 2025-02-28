@@ -1,4 +1,4 @@
-## 1.0.10
+## 1.0.11
 
 * TODO: create this project for others to use. which show a bubble popup easy.
-1. Fix bugs which overlay may not removed.
+1. Optimize bubble rendering performance.

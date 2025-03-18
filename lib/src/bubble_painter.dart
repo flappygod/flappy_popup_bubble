@@ -102,50 +102,50 @@ class BubblePainter extends CustomPainter {
 
     switch (type) {
       case BubbleType.left:
-        path.moveTo(0, offsetTrue);
-        path.lineTo(0, offsetTrue + deltaLength);
+        path.moveTo(0, offsetTrue + deltaLength);
         path.lineTo(-deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
         path.arcToPoint(
           Offset(-deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(arrowRadius),
           clockwise: true,
         );
+        path.lineTo(0, offsetTrue);
         path.close();
         break;
 
       case BubbleType.top:
-        path.moveTo(offsetTrue, 0);
-        path.lineTo(offsetTrue + deltaLength, 0);
+        path.moveTo(offsetTrue + deltaLength, 0);
         path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
         path.arcToPoint(
           Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, -deltaHeight),
           radius: Radius.circular(arrowRadius),
           clockwise: false,
         );
+        path.lineTo(offsetTrue, 0);
         path.close();
         break;
 
       case BubbleType.right:
-        path.moveTo(size.width, offsetTrue);
-        path.lineTo(size.width, offsetTrue + deltaLength);
+        path.moveTo(size.width, offsetTrue + deltaLength);
         path.lineTo(size.width + deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
         path.arcToPoint(
           Offset(size.width + deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(arrowRadius),
           clockwise: false,
         );
+        path.lineTo(size.width, offsetTrue);
         path.close();
         break;
 
       case BubbleType.bottom:
-        path.moveTo(offsetTrue, size.height);
-        path.lineTo(offsetTrue + deltaLength, size.height);
+        path.moveTo(offsetTrue + deltaLength, size.height);
         path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
         path.arcToPoint(
           Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, size.height + deltaHeight),
           radius: Radius.circular(arrowRadius),
           clockwise: true,
         );
+        path.lineTo(offsetTrue, size.height);
         path.close();
         break;
     }

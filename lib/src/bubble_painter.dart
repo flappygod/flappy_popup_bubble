@@ -47,14 +47,13 @@ class BubblePainter extends CustomPainter {
     required this.deltaHeight,
     required this.deltaCorner,
   }) : _paint = Paint()
-          ..isAntiAlias = true
-          ..style = PaintingStyle.fill
-          ..color = color;
+    ..isAntiAlias = true
+    ..style = PaintingStyle.fill
+    ..color = color;
 
   /// Get the arrow radius, calculate only when necessary
   double get arrowRadius {
-    _arrowRadius ??= (deltaCorner / 2) /
-        cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
+    _arrowRadius ??= (deltaCorner / 2) / cos(atan((deltaLength - deltaCorner) / 2 / deltaHeight));
     return _arrowRadius!;
   }
 
@@ -67,7 +66,19 @@ class BubblePainter extends CustomPainter {
     );
 
     // Calculate the true offset for the arrow
-    final double offsetTrue = deltaOffset - deltaLength / 2;
+    double offsetTrue = deltaOffset - deltaLength / 2;
+
+    offsetTrue = max(0, offsetTrue);
+    switch (type) {
+      case BubbleType.left:
+      case BubbleType.right:
+        offsetTrue = min(size.height-deltaLength, offsetTrue);
+        break;
+      case BubbleType.bottom:
+      case BubbleType.top:
+        offsetTrue = min(size.width-deltaLength, offsetTrue);
+        break;
+    }
 
     // Draw the arrow based on the bubble type
     final Path arrowPath = _buildArrowPath(size, offsetTrue);
@@ -93,8 +104,7 @@ class BubblePainter extends CustomPainter {
       case BubbleType.left:
         path.moveTo(0, offsetTrue);
         path.lineTo(0, offsetTrue + deltaLength);
-        path.lineTo(
-            -deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
+        path.lineTo(-deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
         path.arcToPoint(
           Offset(-deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(arrowRadius),
@@ -106,8 +116,7 @@ class BubblePainter extends CustomPainter {
       case BubbleType.top:
         path.moveTo(offsetTrue, 0);
         path.lineTo(offsetTrue + deltaLength, 0);
-        path.lineTo(
-            offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
+        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
         path.arcToPoint(
           Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, -deltaHeight),
           radius: Radius.circular(arrowRadius),
@@ -119,11 +128,9 @@ class BubblePainter extends CustomPainter {
       case BubbleType.right:
         path.moveTo(size.width, offsetTrue);
         path.lineTo(size.width, offsetTrue + deltaLength);
-        path.lineTo(size.width + deltaHeight,
-            offsetTrue + deltaLength / 2 + deltaCorner / 2);
+        path.lineTo(size.width + deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
         path.arcToPoint(
-          Offset(size.width + deltaHeight,
-              offsetTrue + deltaLength / 2 - deltaCorner / 2),
+          Offset(size.width + deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(arrowRadius),
           clockwise: false,
         );
@@ -133,11 +140,9 @@ class BubblePainter extends CustomPainter {
       case BubbleType.bottom:
         path.moveTo(offsetTrue, size.height);
         path.lineTo(offsetTrue + deltaLength, size.height);
-        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2,
-            size.height + deltaHeight);
+        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
         path.arcToPoint(
-          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2,
-              size.height + deltaHeight),
+          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, size.height + deltaHeight),
           radius: Radius.circular(arrowRadius),
           clockwise: true,
         );

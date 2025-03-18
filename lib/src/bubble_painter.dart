@@ -47,9 +47,9 @@ class BubblePainter extends CustomPainter {
     required this.deltaHeight,
     required this.deltaCorner,
   }) : _paint = Paint()
-    ..isAntiAlias = true
-    ..style = PaintingStyle.fill
-    ..color = color;
+          ..isAntiAlias = true
+          ..style = PaintingStyle.fill
+          ..color = color;
 
   /// Get the arrow radius, calculate only when necessary
   double get arrowRadius {
@@ -72,11 +72,11 @@ class BubblePainter extends CustomPainter {
     switch (type) {
       case BubbleType.left:
       case BubbleType.right:
-        offsetTrue = min(size.height-deltaLength, offsetTrue);
+        offsetTrue = min(size.height - deltaLength, offsetTrue);
         break;
       case BubbleType.bottom:
       case BubbleType.top:
-        offsetTrue = min(size.width-deltaLength, offsetTrue);
+        offsetTrue = min(size.width - deltaLength, offsetTrue);
         break;
     }
 
@@ -110,6 +110,19 @@ class BubblePainter extends CustomPainter {
           clockwise: true,
         );
         path.lineTo(0, offsetTrue);
+
+        //then
+        path.arcToPoint(
+          Offset(radius.topLeft.x, 0),
+          radius: Radius.elliptical(radius.topLeft.x, offsetTrue),
+          clockwise: true,
+        );
+        path.lineTo(radius.bottomLeft.x, size.height);
+        path.arcToPoint(
+          Offset(0, offsetTrue + deltaLength),
+          radius: Radius.elliptical(radius.bottomLeft.x, size.height - offsetTrue - deltaLength),
+          clockwise: true,
+        );
         path.close();
         break;
 
@@ -122,6 +135,19 @@ class BubblePainter extends CustomPainter {
           clockwise: false,
         );
         path.lineTo(offsetTrue, 0);
+
+        //then
+        path.arcToPoint(
+          Offset(0, radius.topLeft.y),
+          radius: Radius.elliptical(offsetTrue, radius.topLeft.y),
+          clockwise: false,
+        );
+        path.lineTo(size.width, radius.topRight.y);
+        path.arcToPoint(
+          Offset(offsetTrue + deltaLength, 0),
+          radius: Radius.elliptical(size.width - offsetTrue - deltaLength, radius.topRight.y),
+          clockwise: false,
+        );
         path.close();
         break;
 
@@ -134,6 +160,20 @@ class BubblePainter extends CustomPainter {
           clockwise: false,
         );
         path.lineTo(size.width, offsetTrue);
+
+        //then
+        path.arcToPoint(
+          Offset(size.width - radius.topRight.x, 0),
+          radius: Radius.elliptical(radius.topRight.x, offsetTrue),
+          clockwise: false,
+        );
+        path.lineTo(size.width - radius.bottomRight.x, size.height);
+        path.arcToPoint(
+          Offset(size.width, offsetTrue + deltaLength),
+          radius: Radius.elliptical(radius.bottomRight.x, size.height - offsetTrue - deltaLength),
+          clockwise: false,
+        );
+
         path.close();
         break;
 
@@ -146,6 +186,19 @@ class BubblePainter extends CustomPainter {
           clockwise: true,
         );
         path.lineTo(offsetTrue, size.height);
+
+        //then
+        path.arcToPoint(
+          Offset(0, size.height - radius.bottomLeft.y),
+          radius: Radius.elliptical(offsetTrue, radius.bottomLeft.y),
+          clockwise: true,
+        );
+        path.lineTo(size.width, size.height - radius.bottomRight.y);
+        path.arcToPoint(
+          Offset(offsetTrue + deltaLength, size.height),
+          radius: Radius.elliptical(size.width - offsetTrue - deltaLength, radius.bottomRight.y),
+          clockwise: true,
+        );
         path.close();
         break;
     }

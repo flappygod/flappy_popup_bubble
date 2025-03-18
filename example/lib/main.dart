@@ -102,7 +102,6 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildPopMenu(Widget child) {
     return PopupMenu(
       controller: _controller,
-      showOnLongPress: true,
       translucent: true,
       touchToClose: true,
       menusBuilder: (context, controller) {

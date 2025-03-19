@@ -89,6 +89,10 @@ class PopupMenu extends StatefulWidget {
   ///touch to close
   final bool touchToClose;
 
+  final Color? shadowColor;
+  final double shadowElevation;
+  final bool shadowOccluder;
+
   const PopupMenu({
     super.key,
     this.controller,
@@ -104,6 +108,9 @@ class PopupMenu extends StatefulWidget {
     this.offsetDx,
     this.offsetDy,
     this.contentPadding = EdgeInsets.zero,
+    this.shadowColor,
+    this.shadowElevation = 5,
+    this.shadowOccluder = true,
   });
 
   @override
@@ -265,16 +272,8 @@ class _PopupMenuState extends State<PopupMenu> {
   Widget _buildContent() {
     ///get render box
     ///get render box
-    RenderBox? renderBox =
-        _globalKey.currentContext?.findRenderObject() as RenderBox?;
-
-    ///context is null
-    if (renderBox == null) {
-      return const SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-      );
-    }
+    RenderBox renderBox =
+        _globalKey.currentContext?.findRenderObject() as RenderBox;
 
     ///offset
     final offset = renderBox.localToGlobal(Offset.zero);
@@ -337,7 +336,7 @@ class _PopupMenuState extends State<PopupMenu> {
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
     ///removed
-    if (posLimit.dx > bigRect.width) {
+    if (offset.dx > bigRect.width) {
       return const SizedBox(
         width: double.infinity,
         height: double.infinity,
@@ -365,6 +364,9 @@ class _PopupMenuState extends State<PopupMenu> {
               },
               child: BubbleContainer(
                 width: widget.menuWidth,
+                shadowColor: widget.shadowColor,
+                shadowElevation: widget.shadowElevation,
+                shadowOccluder: widget.shadowOccluder,
                 type: showDown ? BubbleType.top : BubbleType.bottom,
                 radius: BorderRadius.circular(8),
                 deltaOffset: delta,

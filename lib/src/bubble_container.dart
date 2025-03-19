@@ -40,6 +40,10 @@ class BubbleContainer extends StatelessWidget {
   final double? height;
   final Widget? child;
 
+  final Color? shadowColor;
+  final double shadowElevation;
+  final bool shadowOccluder;
+
   const BubbleContainer({
     super.key,
     this.padding,
@@ -56,6 +60,9 @@ class BubbleContainer extends StatelessWidget {
     this.height,
     this.child,
     this.constraints,
+    this.shadowColor,
+    this.shadowElevation = 5,
+    this.shadowOccluder = false,
   });
 
   @override
@@ -71,6 +78,9 @@ class BubbleContainer extends StatelessWidget {
           deltaCorner: deltaCorner,
           deltaLength: deltaLength,
           deltaHeight: deltaHeight,
+          shadowColor: shadowColor,
+          shadowElevation: shadowElevation,
+          shadowOccluder: shadowOccluder,
         ),
         child: Container(
           padding: padding,

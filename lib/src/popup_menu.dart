@@ -270,7 +270,10 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///context is null
     if (renderBox == null) {
-      return const SizedBox();
+      return const SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+      );
     }
 
     ///offset
@@ -335,7 +338,10 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///removed
     if (offset.dx > bigRect.width) {
-      return const SizedBox();
+      return const SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+      );
     }
 
     return Material(

@@ -40,7 +40,7 @@ class BubblePainter extends CustomPainter {
 
   BubblePainter({
     this.radius = const BorderRadius.all(Radius.circular(5)),
-    this.color = Colors.white,
+    this.color = Colors.white70,
     this.type = BubbleType.bottom,
     required this.deltaOffset,
     required this.deltaLength,
@@ -59,12 +59,6 @@ class BubblePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Draw the main bubble rectangle
-    canvas.drawRRect(
-      _buildRRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-      _paint,
-    );
-
     // Calculate the true offset for the arrow
     double offsetTrue = deltaOffset - deltaLength / 2;
 
@@ -85,124 +79,244 @@ class BubblePainter extends CustomPainter {
     canvas.drawPath(arrowPath, _paint);
   }
 
-  /// Build the rounded rectangle for the bubble
-  RRect _buildRRect(Rect rect) {
-    return RRect.fromRectAndCorners(
-      rect,
-      topLeft: radius.topLeft,
-      topRight: radius.topRight,
-      bottomLeft: radius.bottomLeft,
-      bottomRight: radius.bottomRight,
-    );
-  }
-
   /// Build the arrow path based on the bubble type
-  Path _buildArrowPath(Size size, double offsetTrue) {
+  Path _buildArrowPath(Size size, double deltaOffset) {
     final Path path = Path();
 
     switch (type) {
       case BubbleType.left:
-        path.moveTo(0, offsetTrue + deltaLength);
-        path.lineTo(-deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
+        path.moveTo(-deltaHeight, deltaOffset + deltaLength / 2 + deltaCorner / 2);
         path.arcToPoint(
-          Offset(-deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
+          Offset(-deltaHeight, deltaOffset + deltaLength / 2 - deltaCorner / 2),
           radius: Radius.circular(arrowRadius),
           clockwise: true,
         );
-        path.lineTo(0, offsetTrue);
-
-        //then
+        if (deltaOffset <= radius.topLeft.y) {
+          path.lineTo(radius.topLeft.x, 0);
+          path.lineTo(0, radius.topLeft.y);
+          path.arcToPoint(
+            Offset(radius.topLeft.x, 0),
+            radius: radius.topLeft,
+            clockwise: true,
+          );
+        } else {
+          path.lineTo(0, deltaOffset);
+          path.lineTo(0, radius.topLeft.y);
+          path.arcToPoint(
+            Offset(radius.topLeft.x, 0),
+            radius: radius.topLeft,
+            clockwise: true,
+          );
+        }
+        path.lineTo(size.width - radius.topRight.x, 0);
         path.arcToPoint(
-          Offset(radius.topLeft.x, 0),
-          radius: Radius.elliptical(radius.topLeft.x, offsetTrue),
-          clockwise: true,
-        );
-        path.lineTo(radius.bottomLeft.x, size.height);
-        path.arcToPoint(
-          Offset(0, offsetTrue + deltaLength),
-          radius: Radius.elliptical(radius.bottomLeft.x, size.height - offsetTrue - deltaLength),
-          clockwise: true,
-        );
-        path.close();
-        break;
-
-      case BubbleType.top:
-        path.moveTo(offsetTrue + deltaLength, 0);
-        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, -deltaHeight);
-        path.arcToPoint(
-          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, -deltaHeight),
-          radius: Radius.circular(arrowRadius),
-          clockwise: false,
-        );
-        path.lineTo(offsetTrue, 0);
-
-        //then
-        path.arcToPoint(
-          Offset(0, radius.topLeft.y),
-          radius: Radius.elliptical(offsetTrue, radius.topLeft.y),
-          clockwise: false,
-        );
-        path.lineTo(size.width, radius.topRight.y);
-        path.arcToPoint(
-          Offset(offsetTrue + deltaLength, 0),
-          radius: Radius.elliptical(size.width - offsetTrue - deltaLength, radius.topRight.y),
-          clockwise: false,
-        );
-        path.close();
-        break;
-
-      case BubbleType.right:
-        path.moveTo(size.width, offsetTrue + deltaLength);
-        path.lineTo(size.width + deltaHeight, offsetTrue + deltaLength / 2 + deltaCorner / 2);
-        path.arcToPoint(
-          Offset(size.width + deltaHeight, offsetTrue + deltaLength / 2 - deltaCorner / 2),
-          radius: Radius.circular(arrowRadius),
-          clockwise: false,
-        );
-        path.lineTo(size.width, offsetTrue);
-
-        //then
-        path.arcToPoint(
-          Offset(size.width - radius.topRight.x, 0),
-          radius: Radius.elliptical(radius.topRight.x, offsetTrue),
-          clockwise: false,
-        );
-        path.lineTo(size.width - radius.bottomRight.x, size.height);
-        path.arcToPoint(
-          Offset(size.width, offsetTrue + deltaLength),
-          radius: Radius.elliptical(radius.bottomRight.x, size.height - offsetTrue - deltaLength),
-          clockwise: false,
-        );
-
-        path.close();
-        break;
-
-      case BubbleType.bottom:
-        path.moveTo(offsetTrue + deltaLength, size.height);
-        path.lineTo(offsetTrue + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
-        path.arcToPoint(
-          Offset(offsetTrue + deltaLength / 2 - deltaCorner / 2, size.height + deltaHeight),
-          radius: Radius.circular(arrowRadius),
-          clockwise: true,
-        );
-        path.lineTo(offsetTrue, size.height);
-
-        //then
-        path.arcToPoint(
-          Offset(0, size.height - radius.bottomLeft.y),
-          radius: Radius.elliptical(offsetTrue, radius.bottomLeft.y),
+          Offset(size.width, radius.topRight.y),
+          radius: radius.topRight,
           clockwise: true,
         );
         path.lineTo(size.width, size.height - radius.bottomRight.y);
         path.arcToPoint(
-          Offset(offsetTrue + deltaLength, size.height),
-          radius: Radius.elliptical(size.width - offsetTrue - deltaLength, radius.bottomRight.y),
+          Offset(size.width - radius.bottomRight.x, size.height),
+          radius: radius.bottomRight,
           clockwise: true,
         );
+        path.lineTo(radius.bottomLeft.x, size.height);
+        if (deltaOffset + deltaLength >= size.height - radius.bottomLeft.y) {
+          path.lineTo(-deltaHeight, deltaOffset + deltaLength / 2 + deltaCorner / 2);
+          path.lineTo(0, size.height - radius.bottomLeft.y);
+          path.lineTo(radius.bottomLeft.x, size.height);
+          path.arcToPoint(
+            Offset(0, size.height - radius.bottomLeft.y),
+            radius: radius.bottomLeft,
+            clockwise: true,
+          );
+        } else {
+          path.arcToPoint(
+            Offset(0, size.height - radius.bottomLeft.y),
+            radius: radius.bottomLeft,
+            clockwise: true,
+          );
+          path.lineTo(0, deltaOffset + deltaLength);
+        }
+        path.close();
+        break;
+
+      case BubbleType.top:
+        path.moveTo(deltaOffset + deltaLength / 2 - deltaCorner / 2, -deltaHeight);
+        path.arcToPoint(
+          Offset(deltaOffset + deltaLength / 2 + deltaCorner / 2, -deltaHeight),
+          radius: Radius.circular(arrowRadius),
+          clockwise: true,
+        );
+        if (deltaOffset + deltaLength >= size.width - radius.topRight.x) {
+          path.lineTo(size.width, radius.topRight.y);
+          path.lineTo(size.width - radius.topRight.x, 0);
+          path.arcToPoint(
+            Offset(size.width, radius.topRight.y),
+            radius: radius.topRight,
+            clockwise: true,
+          );
+        } else {
+          path.lineTo(deltaOffset + deltaLength, 0);
+          path.lineTo(size.width - radius.topRight.x, 0);
+          path.arcToPoint(
+            Offset(size.width, radius.topRight.y),
+            radius: radius.topRight,
+            clockwise: true,
+          );
+        }
+        path.lineTo(size.width, size.height - radius.bottomRight.y);
+        path.arcToPoint(
+          Offset(size.width - radius.bottomRight.x, size.height),
+          radius: radius.bottomRight,
+          clockwise: true,
+        );
+        path.lineTo(radius.bottomLeft.x, size.height);
+        path.arcToPoint(
+          Offset(0, size.height - radius.bottomLeft.y),
+          radius: radius.bottomLeft,
+          clockwise: true,
+        );
+        path.lineTo(0, radius.topLeft.y);
+        if (deltaOffset <= radius.topLeft.x) {
+          path.lineTo(deltaOffset + deltaLength / 2 - deltaCorner / 2, -deltaHeight);
+          path.lineTo(radius.topLeft.x, 0);
+          path.lineTo(0, radius.topLeft.y);
+          path.arcToPoint(
+            Offset(radius.topLeft.x, 0),
+            radius: radius.topLeft,
+            clockwise: true,
+          );
+        } else {
+          path.arcToPoint(
+            Offset(radius.topLeft.x, 0),
+            radius: radius.topLeft,
+            clockwise: true,
+          );
+          path.lineTo(deltaOffset, 0);
+        }
+        path.close();
+        break;
+
+      case BubbleType.right:
+        path.moveTo(size.width + deltaHeight, deltaOffset + deltaLength / 2 - deltaCorner / 2);
+        path.arcToPoint(
+          Offset(size.width + deltaHeight, deltaOffset + deltaLength / 2 + deltaCorner / 2),
+          radius: Radius.circular(arrowRadius),
+          clockwise: true,
+        );
+        if (deltaOffset + deltaLength >= size.height - radius.bottomRight.y) {
+          path.lineTo(size.width - radius.bottomRight.x, size.height);
+          path.lineTo(size.width, size.height - radius.bottomRight.y);
+          path.arcToPoint(
+            Offset(size.width - radius.bottomRight.x, size.height),
+            radius: radius.bottomRight,
+            clockwise: true,
+          );
+        } else {
+          path.lineTo(size.width, deltaOffset + deltaLength);
+          path.lineTo(size.width, size.height - radius.bottomRight.y);
+          path.arcToPoint(
+            Offset(size.width - radius.bottomRight.x, size.height),
+            radius: radius.bottomRight,
+            clockwise: true,
+          );
+        }
+        path.lineTo(radius.bottomLeft.x, size.height);
+        path.arcToPoint(
+          Offset(0, size.height - radius.bottomLeft.y),
+          radius: radius.bottomLeft,
+          clockwise: true,
+        );
+        path.lineTo(0, radius.topLeft.y);
+        path.arcToPoint(
+          Offset(radius.topLeft.x, 0),
+          radius: radius.topLeft,
+          clockwise: true,
+        );
+        path.lineTo(size.width - radius.topRight.x, 0);
+        if (deltaOffset <= radius.topRight.y) {
+          path.lineTo(size.width + deltaHeight, deltaOffset + deltaLength / 2 - deltaCorner / 2);
+          path.lineTo(size.width, radius.topLeft.y);
+          path.lineTo(size.width - radius.topRight.x, 0);
+          path.arcToPoint(
+            Offset(size.width, radius.topRight.y),
+            radius: radius.topRight,
+            clockwise: true,
+          );
+        } else {
+          path.arcToPoint(
+            Offset(size.width, radius.topRight.y),
+            radius: radius.topRight,
+            clockwise: true,
+          );
+          path.lineTo(size.width, deltaOffset);
+        }
+        path.close();
+        break;
+
+      case BubbleType.bottom:
+        path.moveTo(deltaOffset + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
+        path.arcToPoint(
+          Offset(deltaOffset + deltaLength / 2 - deltaCorner / 2, size.height + deltaHeight),
+          radius: Radius.circular(arrowRadius),
+          clockwise: true,
+        );
+        if (deltaOffset <= radius.bottomLeft.x) {
+          path.lineTo(0, size.height - radius.bottomLeft.y);
+          path.lineTo(radius.bottomLeft.x, size.height);
+          path.arcToPoint(
+            Offset(0, size.height - radius.bottomLeft.y),
+            radius: radius.bottomLeft,
+            clockwise: true,
+          );
+        } else {
+          path.lineTo(deltaOffset, size.height);
+          path.lineTo(radius.bottomLeft.x, size.height);
+          path.arcToPoint(
+            Offset(0, size.height - radius.bottomLeft.y),
+            radius: radius.bottomLeft,
+            clockwise: true,
+          );
+        }
+        path.lineTo(0, radius.topLeft.y);
+        path.arcToPoint(
+          Offset(radius.topLeft.x, 0),
+          radius: radius.topLeft,
+          clockwise: true,
+        );
+        path.arcToPoint(
+          Offset(radius.topLeft.x, 0),
+          radius: radius.topLeft,
+          clockwise: true,
+        );
+        path.lineTo(size.width - radius.topRight.x, 0);
+        path.arcToPoint(
+          Offset(size.width, radius.topRight.y),
+          radius: radius.topRight,
+          clockwise: true,
+        );
+        path.lineTo(size.width, size.height - radius.bottomRight.y);
+        if (deltaOffset + deltaLength >= size.width - radius.bottomRight.x) {
+          path.lineTo(deltaOffset + deltaLength / 2 + deltaCorner / 2, size.height + deltaHeight);
+          path.lineTo(size.width - radius.bottomRight.x, size.height);
+          path.lineTo(size.width, size.height - radius.bottomRight.y);
+          path.arcToPoint(
+            Offset(size.width - radius.bottomRight.x, size.height),
+            radius: radius.bottomRight,
+            clockwise: true,
+          );
+        } else {
+          path.arcToPoint(
+            Offset(size.width - radius.bottomRight.x, size.height),
+            radius: radius.bottomRight,
+            clockwise: true,
+          );
+          path.lineTo(deltaOffset + deltaLength, size.height);
+        }
         path.close();
         break;
     }
-
     return path;
   }
 

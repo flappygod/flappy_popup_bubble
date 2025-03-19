@@ -84,6 +84,7 @@ class BubblePainter extends CustomPainter {
     // Draw the arrow based on the bubble type
     final Path arrowPath = _buildArrowPath(size, offsetTrue);
 
+    // shadow color
     if (shadowColor != null) {
       canvas.drawShadow(
         arrowPath,

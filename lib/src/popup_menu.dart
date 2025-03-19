@@ -89,6 +89,9 @@ class PopupMenu extends StatefulWidget {
   ///touch to close
   final bool touchToClose;
 
+  ///radius
+  final BorderRadius radius;
+
   final Color? shadowColor;
   final double shadowElevation;
   final bool shadowOccluder;
@@ -111,6 +114,9 @@ class PopupMenu extends StatefulWidget {
     this.shadowColor,
     this.shadowElevation = 5,
     this.shadowOccluder = true,
+    this.radius = const BorderRadius.all(
+      Radius.circular(8),
+    ),
   });
 
   @override
@@ -368,7 +374,7 @@ class _PopupMenuState extends State<PopupMenu> {
                 shadowElevation: widget.shadowElevation,
                 shadowOccluder: widget.shadowOccluder,
                 type: showDown ? BubbleType.top : BubbleType.bottom,
-                radius: BorderRadius.circular(8),
+                radius: widget.radius,
                 deltaOffset: delta,
                 color: widget.backgroundColor,
                 child: Column(

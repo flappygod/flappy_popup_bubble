@@ -337,7 +337,7 @@ class _PopupMenuState extends State<PopupMenu> {
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
     ///removed
-    if (offset.dx > bigRect.width) {
+    if (posLimit.dx > bigRect.width) {
       return const SizedBox(
         width: double.infinity,
         height: double.infinity,

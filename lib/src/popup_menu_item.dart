@@ -17,6 +17,12 @@ class PopupMenuBtn extends StatelessWidget {
   ///on tap
   final VoidCallback? onTap;
 
+  ///height
+  final double height;
+
+  ///padding
+  final EdgeInsets? padding;
+
   const PopupMenuBtn({
     super.key,
     this.backgroundColor,
@@ -24,6 +30,8 @@ class PopupMenuBtn extends StatelessWidget {
     this.icon,
     this.textStyle,
     this.onTap,
+    this.height = 40,
+    this.padding,
   });
 
   @override
@@ -33,8 +41,8 @@ class PopupMenuBtn extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        height: 40,
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+        height: height,
+        padding: padding ?? const EdgeInsets.fromLTRB(10, 0, 10, 0),
         alignment: Alignment.center,
         color: backgroundColor,
         child: Row(

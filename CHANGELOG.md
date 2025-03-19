@@ -1,3 +1,3 @@
 ## 1.0.12
 
-1. Add support for click pop.
+1. Add support for click pop and bugs fixed.

@@ -351,11 +351,6 @@ class _PopupMenuState extends State<PopupMenu> {
     ///delta offset
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
-    ///removed
-    if (posLimit.dx > bigRect.width) {
-      return const SizedBox();
-    }
-
     return Material(
       color: Colors.transparent,
       type: MaterialType.transparency,

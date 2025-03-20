@@ -353,10 +353,7 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///removed
     if (posLimit.dx > bigRect.width) {
-      return const SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-      );
+      return const SizedBox();
     }
 
     return Material(

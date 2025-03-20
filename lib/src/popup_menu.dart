@@ -351,48 +351,55 @@ class _PopupMenuState extends State<PopupMenu> {
     ///delta offset
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
+    ///show or not
+    bool visible = offset.dx < MediaQuery.of(context).size.width &&
+        offset.dx + menuWidth > 0;
+
     return Material(
       color: Colors.transparent,
       type: MaterialType.transparency,
 
       ///use stack for the popup
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          PopupAnimation(
-            controller: _animationHoverController,
-            child: widget.hover ?? const SizedBox(),
-          ),
+      child: Visibility(
+        visible: visible,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            PopupAnimation(
+              controller: _animationHoverController,
+              child: widget.hover ?? const SizedBox(),
+            ),
 
-          ///use position
-          Positioned(
-            left: posLimit.dx - (widget.offsetDx ?? 0),
-            top: posLimit.dy - (widget.offsetDy ?? 0),
-            child: PopupAnimation(
-              controller: _animationController,
-              onHide: () {
-                ///remove overlay
-                _currentShowOverlay?.remove();
-                _currentShowOverlay = null;
-              },
-              child: BubbleContainer(
-                width: widget.menuWidth,
-                shadowColor: widget.shadowColor,
-                shadowElevation: widget.shadowElevation,
-                shadowOccluder: widget.shadowOccluder,
-                type: showDown ? BubbleType.top : BubbleType.bottom,
-                radius: widget.radius,
-                deltaOffset: delta,
-                color: widget.backgroundColor,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: menus,
+            ///use position
+            Positioned(
+              left: posLimit.dx - (widget.offsetDx ?? 0),
+              top: posLimit.dy - (widget.offsetDy ?? 0),
+              child: PopupAnimation(
+                controller: _animationController,
+                onHide: () {
+                  ///remove overlay
+                  _currentShowOverlay?.remove();
+                  _currentShowOverlay = null;
+                },
+                child: BubbleContainer(
+                  width: widget.menuWidth,
+                  shadowColor: widget.shadowColor,
+                  shadowElevation: widget.shadowElevation,
+                  shadowOccluder: widget.shadowOccluder,
+                  type: showDown ? BubbleType.top : BubbleType.bottom,
+                  radius: widget.radius,
+                  deltaOffset: delta,
+                  color: widget.backgroundColor,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: menus,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

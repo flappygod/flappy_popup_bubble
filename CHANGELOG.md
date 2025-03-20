@@ -1,3 +1,3 @@
 ## 1.0.13
 
-1. Add support for click pop and bugs fixed.
+1. Bugs fixed and add change bubble paint.

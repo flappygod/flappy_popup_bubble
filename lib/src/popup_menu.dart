@@ -355,7 +355,8 @@ class _PopupMenuState extends State<PopupMenu> {
     bool visible = offset.dx < MediaQuery.of(context).size.width &&
         offset.dx + menuWidth > 0 &&
         offset.dy < MediaQuery.of(context).size.height &&
-        offset.dy + menuHeight > 0;
+        offset.dy + menuHeight > 0 &&
+        menus.isNotEmpty;
 
     return Material(
       color: Colors.transparent,

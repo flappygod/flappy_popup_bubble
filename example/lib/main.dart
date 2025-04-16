@@ -104,8 +104,8 @@ class _MyHomePageState extends State<MyHomePage> {
       controller: _controller,
       translucent: true,
       barrierDismissible: true,
-      shadowColor: Colors.black,
-      shadowElevation: 5.0,
+      bubbleShadowColor: Colors.black,
+      bubbleShadowElevation: 5.0,
       menusBuilder: (context, controller) {
         return [
           PopupMenuBtn(

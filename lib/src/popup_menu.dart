@@ -69,9 +69,6 @@ class PopupMenu extends StatefulWidget {
   ///controller
   final PopupMenuController? controller;
 
-  ///background color
-  final Color backgroundColor;
-
   ///divider
   final Color dividerColor;
 
@@ -105,22 +102,27 @@ class PopupMenu extends StatefulWidget {
   ///touch to close
   final bool barrierDismissible;
 
-  ///radius
-  final BorderRadius radius;
-
-  ///shadows
-  final Color? shadowColor;
-  final double shadowElevation;
-  final bool shadowOccluder;
-
   ///hover widget
   final Widget? hover;
 
+  ///align
+  final PopupMenuAlign align;
+
+  ///sub head
   final Widget? subHead;
   final double? subHeadHeight;
   final PopupMenuSubHeadAlign subHeadAlign;
 
-  final PopupMenuAlign align;
+  ///radius
+  ///background color
+  final Color bubbleColor;
+  final BorderRadius bubbleRadius;
+  final Color? bubbleShadowColor;
+  final double bubbleShadowElevation;
+  final bool bubbleShadowOccluder;
+
+  ///if this set, other param was disable
+  final Decoration? bubbleDecoration;
 
   const PopupMenu({
     super.key,
@@ -129,7 +131,7 @@ class PopupMenu extends StatefulWidget {
     required this.menusBuilder,
     this.menuWidth = 120,
     this.menuHeight = 40,
-    this.backgroundColor = const Color(0xFF5A5B5E),
+    this.bubbleColor = const Color(0xFF5A5B5E),
     this.dividerColor = Colors.black87,
     this.triggerType = PopupMenuTriggerType.onLongPress,
     this.barrierDismissible = true,
@@ -138,17 +140,16 @@ class PopupMenu extends StatefulWidget {
     this.offsetDx,
     this.offsetDy,
     this.contentPadding = EdgeInsets.zero,
-    this.shadowColor,
-    this.shadowElevation = 5,
-    this.shadowOccluder = true,
-    this.radius = const BorderRadius.all(
-      Radius.circular(8),
-    ),
+    this.bubbleShadowColor,
+    this.bubbleShadowElevation = 5,
+    this.bubbleShadowOccluder = true,
     this.hover,
     this.subHead,
     this.subHeadHeight,
     this.subHeadAlign = PopupMenuSubHeadAlign.end,
     this.align = PopupMenuAlign.center,
+    this.bubbleRadius = const BorderRadius.all(Radius.circular(8)),
+    this.bubbleDecoration,
   }) : assert((subHead == null && subHeadHeight == null) ||
             (subHead != null && subHeadHeight != null));
 
@@ -497,23 +498,39 @@ class _PopupMenuState extends State<PopupMenu> {
   ///menus
   Widget _buildOverlayPopContent(
       bool showDown, double delta, List<Widget> menus) {
-    Widget content = BubbleContainer(
-      width: widget.menuWidth,
-      shadowColor: widget.shadowColor,
-      shadowElevation: widget.shadowElevation,
-      shadowOccluder: widget.shadowOccluder,
-      type: showDown ? BubbleType.top : BubbleType.bottom,
-      radius: widget.radius,
-      deltaOffset: delta,
-      color: widget.backgroundColor,
-      child: Column(
-        verticalDirection:
-            showDown ? VerticalDirection.down : VerticalDirection.up,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: menus,
-      ),
-    );
+    ///bubble
+    Widget content;
+    if (widget.bubbleDecoration != null) {
+      content = Container(
+        width: widget.menuWidth,
+        decoration: widget.bubbleDecoration,
+        child: Column(
+          verticalDirection:
+              showDown ? VerticalDirection.down : VerticalDirection.up,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: menus,
+        ),
+      );
+    } else {
+      content = BubbleContainer(
+        width: widget.menuWidth,
+        radius: widget.bubbleRadius,
+        color: widget.bubbleColor,
+        type: showDown ? BubbleType.top : BubbleType.bottom,
+        deltaOffset: delta,
+        shadowColor: widget.bubbleShadowColor,
+        shadowElevation: widget.bubbleShadowElevation,
+        shadowOccluder: widget.bubbleShadowOccluder,
+        child: Column(
+          verticalDirection:
+              showDown ? VerticalDirection.down : VerticalDirection.up,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: menus,
+        ),
+      );
+    }
 
     ///sub head is null
     if (widget.subHead == null) {

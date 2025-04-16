@@ -1,3 +1,3 @@
-## 1.0.13
+## 1.0.14
 
-1. Bugs fixed and add change bubble paint.
+1. Add showChildTop and subHead for custom your child.

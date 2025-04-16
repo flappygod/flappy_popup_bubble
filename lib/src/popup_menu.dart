@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'popup_animation.dart';
 import 'bubble_container.dart';
+import 'popup_animation.dart';
 import 'bubble_painter.dart';
 
 ///type
@@ -10,7 +10,8 @@ enum PopupMenuTriggerType {
 }
 
 ///build menu
-typedef PopupMenuBuilder = List<Widget> Function(BuildContext context, PopupMenuController controller);
+typedef PopupMenuBuilder = List<Widget> Function(
+    BuildContext context, PopupMenuController controller);
 
 ///pop feed animation alpha controller
 class PopupMenuController {
@@ -102,6 +103,9 @@ class PopupMenu extends StatefulWidget {
   ///hover widget
   final Widget? hover;
 
+  final Widget? subHead;
+  final double? subHeadHeight;
+
   const PopupMenu({
     super.key,
     this.controller,
@@ -125,7 +129,10 @@ class PopupMenu extends StatefulWidget {
       Radius.circular(8),
     ),
     this.hover,
-  });
+    this.subHead,
+    this.subHeadHeight,
+  }) : assert((subHead == null && subHeadHeight == null) ||
+            (subHead != null && subHeadHeight != null));
 
   @override
   State<StatefulWidget> createState() {
@@ -141,10 +148,12 @@ class _PopupMenuState extends State<PopupMenu> {
   late ValueChanged<int> _listener;
 
   ///controller
-  final PopupAnimationController _animationController = PopupAnimationController();
+  final PopupAnimationController _animationController =
+      PopupAnimationController();
 
   ///controller
-  final PopupAnimationController _animationHoverController = PopupAnimationController();
+  final PopupAnimationController _animationHoverController =
+      PopupAnimationController();
 
   ///global key
   final GlobalKey _currentKey = GlobalKey();
@@ -236,9 +245,15 @@ class _PopupMenuState extends State<PopupMenu> {
     ///if overlay is not show ,show overlay
     if (_currentShowOverlay == null) {
       ///get child size and location
-      RenderBox renderBox = _currentKey.currentContext?.findRenderObject() as RenderBox;
+      RenderBox renderBox =
+          _currentKey.currentContext?.findRenderObject() as RenderBox;
       final Offset offset = renderBox.localToGlobal(Offset.zero);
-      _currentRect = Rect.fromLTWH(offset.dx, offset.dy, renderBox.size.width, renderBox.size.height);
+      _currentRect = Rect.fromLTWH(
+        offset.dx,
+        offset.dy,
+        renderBox.size.width,
+        renderBox.size.height,
+      );
 
       ///current is pop
       _currentIsPop = true;
@@ -284,7 +299,8 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build Separators
-  List<Widget> createListWithSeparators(List<Widget> originalList, Widget separator) {
+  List<Widget> createListWithSeparators(
+      List<Widget> originalList, Widget separator) {
     List<Widget> listWithSeparators = [];
     for (int i = 0; i < originalList.length; i++) {
       listWithSeparators.add(originalList[i]);
@@ -320,18 +336,25 @@ class _PopupMenuState extends State<PopupMenu> {
     List<Widget> menusWidgets = widget.menusBuilder(context, _menuController!);
 
     ///menus
-    List<Widget> menus = createListWithSeparators(menusWidgets, _buildDivider());
+    List<Widget> menus =
+        createListWithSeparators(menusWidgets, _buildDivider());
 
     ///width and height
     double menuWidth = widget.menuWidth;
-    double menuHeight = (widget.menuHeight + _getDividerHeight()) * menusWidgets.length;
+    double menuHeight =
+        (widget.menuHeight + _getDividerHeight()) * menusWidgets.length +
+            (widget.subHeadHeight ?? 0);
 
     ///get the container rect
     Rect bigRect = Rect.fromLTWH(
       widget.contentPadding.left,
       widget.contentPadding.top,
-      MediaQuery.of(context).size.width - widget.contentPadding.left - widget.contentPadding.right,
-      MediaQuery.of(context).size.height - widget.contentPadding.top - widget.contentPadding.bottom,
+      MediaQuery.of(context).size.width -
+          widget.contentPadding.left -
+          widget.contentPadding.right,
+      MediaQuery.of(context).size.height -
+          widget.contentPadding.top -
+          widget.contentPadding.bottom,
     );
 
     ///limit the rect
@@ -342,18 +365,19 @@ class _PopupMenuState extends State<PopupMenu> {
       menuHeight,
     );
 
-    bool showDown = true;
+    ///check which space is larger
+    bool showDown = (bigRect.height - rect.top - smallRect.height) >= rect.top;
+
+    ///position
+    Offset pos;
 
     ///get left and top
-    Offset pos = Offset(
-      rect.left - widget.menuWidth / 2 + rect.width / 2,
-      rect.top + rect.height + 10,
-    );
-
-    ///up or down
-    if (pos.dy + menuHeight + 100 > bigRect.height) {
-      showDown = false;
-
+    if (showDown) {
+      pos = Offset(
+        rect.left - widget.menuWidth / 2 + rect.width / 2,
+        rect.top + rect.height + 10,
+      );
+    } else {
       ///get left and top
       pos = Offset(
         rect.left - widget.menuWidth / 2 + rect.width / 2,
@@ -384,20 +408,8 @@ class _PopupMenuState extends State<PopupMenu> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            ///hover
-            PopupAnimation(
-              controller: _animationHoverController,
-              child: widget.hover ?? const SizedBox(),
-            ),
-
-            ///show child or not
-            if (widget.showChildTop)
-              Container(
-                margin: EdgeInsets.fromLTRB(rect.left, rect.top, 0, 0),
-                width: rect.width,
-                height: rect.height,
-                child: widget.child,
-              ),
+            _buildOverlayHover(),
+            _buildOverlayChild(),
 
             ///use position
             Positioned(
@@ -409,28 +421,12 @@ class _PopupMenuState extends State<PopupMenu> {
                   ///remove overlay
                   _currentShowOverlay?.remove();
                   _currentShowOverlay = null;
-
-                  ///current is pop
                   _currentIsPop = false;
                   if (mounted) {
                     setState(() {});
                   }
                 },
-                child: BubbleContainer(
-                  width: widget.menuWidth,
-                  shadowColor: widget.shadowColor,
-                  shadowElevation: widget.shadowElevation,
-                  shadowOccluder: widget.shadowOccluder,
-                  type: showDown ? BubbleType.top : BubbleType.bottom,
-                  radius: widget.radius,
-                  deltaOffset: delta,
-                  color: widget.backgroundColor,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: menus,
-                  ),
-                ),
+                child: _buildOverlayPopContent(showDown, delta, menus),
               ),
             ),
           ],
@@ -439,10 +435,76 @@ class _PopupMenuState extends State<PopupMenu> {
     );
   }
 
+  ///hover
+  Widget _buildOverlayHover() {
+    return PopupAnimation(
+      controller: _animationHoverController,
+      child: widget.hover ?? const SizedBox(),
+    );
+  }
+
+  ///show child or not
+  Widget _buildOverlayChild() {
+    if (widget.showChildTop) {
+      return Container(
+        margin: EdgeInsets.fromLTRB(_currentRect.left, _currentRect.top, 0, 0),
+        width: _currentRect.width,
+        height: _currentRect.height,
+        child: widget.child,
+      );
+    } else {
+      return const SizedBox();
+    }
+  }
+
+  ///menus
+  Widget _buildOverlayPopContent(
+      bool showDown, double delta, List<Widget> menus) {
+    ///content
+    Widget contentWidget = BubbleContainer(
+      width: widget.menuWidth,
+      shadowColor: widget.shadowColor,
+      shadowElevation: widget.shadowElevation,
+      shadowOccluder: widget.shadowOccluder,
+      type: showDown ? BubbleType.top : BubbleType.bottom,
+      radius: widget.radius,
+      deltaOffset: delta,
+      color: widget.backgroundColor,
+      child: Column(
+        verticalDirection:
+            showDown ? VerticalDirection.down : VerticalDirection.up,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: menus,
+      ),
+    );
+
+    ///sub head
+    if (widget.subHead == null) {
+      return contentWidget;
+    } else {
+      return showDown
+          ? Column(
+              children: [
+                widget.subHead!,
+                contentWidget,
+              ],
+            )
+          : Column(
+              children: [
+                contentWidget,
+                widget.subHead!,
+              ],
+            );
+    }
+  }
+
   ///build constrain rect
-  Offset constrainRectWithinRect(Rect bigRect, Rect smallRect, Offset smallRectOffset) {
+  Offset constrainRectWithinRect(
+      Rect bigRect, Rect smallRect, Offset smallRectOffset) {
     // 计算小 Rect 右下角的 Offset
-    Offset smallRectBottomRight = smallRectOffset + Offset(smallRect.width, smallRect.height);
+    Offset smallRectBottomRight =
+        smallRectOffset + Offset(smallRect.width, smallRect.height);
 
     // 计算小 Rect 能够移动的最大 Offset
     double maxDx = bigRect.right - smallRect.width;

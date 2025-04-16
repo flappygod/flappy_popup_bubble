@@ -9,8 +9,16 @@ enum PopupMenuTriggerType {
   onLongPress,
 }
 
-enum PopupSubHeadAlign {
+///sub head align
+enum PopupMenuSubHeadAlign {
   start,
+  end,
+}
+
+///sub head align
+enum PopupMenuAlign {
+  start,
+  center,
   end,
 }
 
@@ -110,7 +118,9 @@ class PopupMenu extends StatefulWidget {
 
   final Widget? subHead;
   final double? subHeadHeight;
-  final PopupSubHeadAlign subHeadAlign;
+  final PopupMenuSubHeadAlign subHeadAlign;
+
+  final PopupMenuAlign align;
 
   const PopupMenu({
     super.key,
@@ -137,7 +147,8 @@ class PopupMenu extends StatefulWidget {
     this.hover,
     this.subHead,
     this.subHeadHeight,
-    this.subHeadAlign = PopupSubHeadAlign.end,
+    this.subHeadAlign = PopupMenuSubHeadAlign.end,
+    this.align = PopupMenuAlign.center,
   }) : assert((subHead == null && subHeadHeight == null) ||
             (subHead != null && subHeadHeight != null));
 
@@ -406,8 +417,21 @@ class _PopupMenuState extends State<PopupMenu> {
         rect.top + menuHeight > 0 &&
         menus.isNotEmpty;
 
-    double showPosX = posLimit.dx - (widget.offsetDx ?? 0);
     double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
+    double showPosX = 0;
+
+    ///align
+    switch (widget.align) {
+      case PopupMenuAlign.start:
+        showPosX = rect.left;
+        break;
+      case PopupMenuAlign.end:
+        showPosX = rect.right - widget.menuWidth;
+        break;
+      case PopupMenuAlign.center:
+        showPosX = posLimit.dx - (widget.offsetDx ?? 0);
+        break;
+    }
 
     return Material(
       color: Colors.transparent,
@@ -461,7 +485,9 @@ class _PopupMenuState extends State<PopupMenu> {
         margin: EdgeInsets.fromLTRB(_currentRect.left, _currentRect.top, 0, 0),
         width: _currentRect.width,
         height: _currentRect.height,
-        child: widget.child,
+        child: IgnorePointer(
+          child: widget.child,
+        ),
       );
     } else {
       return const SizedBox();
@@ -494,45 +520,27 @@ class _PopupMenuState extends State<PopupMenu> {
       return content;
     }
 
-    return showDown
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
+      verticalDirection:
+          showDown ? VerticalDirection.down : VerticalDirection.up,
+      children: [
+        SizedBox(
+          width: widget.menuWidth,
+          height: widget.subHeadHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              SizedBox(
-                width: widget.menuWidth,
-                height: widget.subHeadHeight,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    widget.subHeadAlign == PopupSubHeadAlign.start
-                        ? Positioned(left: 0, top: 0, child: widget.subHead!)
-                        : Positioned(right: 0, top: 0, child: widget.subHead!),
-                  ],
-                ),
-              ),
-              content,
+              widget.subHeadAlign == PopupMenuSubHeadAlign.start
+                  ? Positioned(left: 0, top: 0, child: widget.subHead!)
+                  : Positioned(right: 0, top: 0, child: widget.subHead!),
             ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              content,
-              SizedBox(
-                width: widget.menuWidth,
-                height: widget.subHeadHeight,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    widget.subHeadAlign == PopupSubHeadAlign.start
-                        ? Positioned(left: 0, top: 0, child: widget.subHead!)
-                        : Positioned(right: 0, top: 0, child: widget.subHead!),
-                  ],
-                ),
-              ),
-            ],
-          );
+          ),
+        ),
+        content,
+      ],
+    );
   }
 
   ///build constrain rect

@@ -1,3 +1,3 @@
-## 1.0.14
+## 1.0.15
 
-1. Add showChildTop and subHead for custom your child.
+1. Bugs fixed for margin value.

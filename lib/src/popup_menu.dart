@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'bubble_container.dart';
 import 'popup_animation.dart';
@@ -483,7 +485,8 @@ class _PopupMenuState extends State<PopupMenu> {
   Widget _buildOverlayChild() {
     if (widget.showChildTop) {
       return Container(
-        margin: EdgeInsets.fromLTRB(_currentRect.left, _currentRect.top, 0, 0),
+        margin: EdgeInsets.fromLTRB(
+            max(0, _currentRect.left), max(0, _currentRect.top), 0, 0),
         width: _currentRect.width,
         height: _currentRect.height,
         child: IgnorePointer(

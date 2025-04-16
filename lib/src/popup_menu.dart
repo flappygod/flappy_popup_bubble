@@ -10,8 +10,7 @@ enum PopupMenuTriggerType {
 }
 
 ///build menu
-typedef PopupMenuBuilder = List<Widget> Function(
-    BuildContext context, PopupMenuController controller);
+typedef PopupMenuBuilder = List<Widget> Function(BuildContext context, PopupMenuController controller);
 
 ///pop feed animation alpha controller
 class PopupMenuController {
@@ -80,6 +79,9 @@ class PopupMenu extends StatefulWidget {
   ///translucent
   final bool translucent;
 
+  ///show child on top or not
+  final bool showChildTop;
+
   ///show on long press
   final PopupMenuTriggerType triggerType;
 
@@ -87,11 +89,12 @@ class PopupMenu extends StatefulWidget {
   final EdgeInsets contentPadding;
 
   ///touch to close
-  final bool touchToClose;
+  final bool barrierDismissible;
 
   ///radius
   final BorderRadius radius;
 
+  ///shadows
   final Color? shadowColor;
   final double shadowElevation;
   final bool shadowOccluder;
@@ -108,9 +111,10 @@ class PopupMenu extends StatefulWidget {
     this.menuHeight = 40,
     this.backgroundColor = const Color(0xFF5A5B5E),
     this.dividerColor = Colors.black87,
-    this.translucent = false,
     this.triggerType = PopupMenuTriggerType.onLongPress,
-    this.touchToClose = true,
+    this.barrierDismissible = true,
+    this.showChildTop = false,
+    this.translucent = false,
     this.offsetDx,
     this.offsetDy,
     this.contentPadding = EdgeInsets.zero,
@@ -137,12 +141,10 @@ class _PopupMenuState extends State<PopupMenu> {
   late ValueChanged<int> _listener;
 
   ///controller
-  final PopupAnimationController _animationController =
-      PopupAnimationController();
+  final PopupAnimationController _animationController = PopupAnimationController();
 
   ///controller
-  final PopupAnimationController _animationHoverController =
-      PopupAnimationController();
+  final PopupAnimationController _animationHoverController = PopupAnimationController();
 
   ///global key
   final GlobalKey _globalKey = GlobalKey();
@@ -256,8 +258,7 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build Separators
-  List<Widget> createListWithSeparators(
-      List<Widget> originalList, Widget separator) {
+  List<Widget> createListWithSeparators(List<Widget> originalList, Widget separator) {
     List<Widget> listWithSeparators = [];
     for (int i = 0; i < originalList.length; i++) {
       listWithSeparators.add(originalList[i]);
@@ -276,7 +277,7 @@ class _PopupMenuState extends State<PopupMenu> {
         : GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
-              if (widget.touchToClose) {
+              if (widget.barrierDismissible) {
                 _hideOverlay();
               }
             },
@@ -288,8 +289,7 @@ class _PopupMenuState extends State<PopupMenu> {
   Widget _buildContent() {
     ///get render box
     ///get render box
-    RenderBox renderBox =
-        _globalKey.currentContext?.findRenderObject() as RenderBox;
+    RenderBox renderBox = _globalKey.currentContext?.findRenderObject() as RenderBox;
 
     ///offset
     final offset = renderBox.localToGlobal(Offset.zero);
@@ -298,24 +298,18 @@ class _PopupMenuState extends State<PopupMenu> {
     List<Widget> menusWidgets = widget.menusBuilder(context, _menuController!);
 
     ///menus
-    List<Widget> menus =
-        createListWithSeparators(menusWidgets, _buildDivider());
+    List<Widget> menus = createListWithSeparators(menusWidgets, _buildDivider());
 
     ///width and height
     double menuWidth = widget.menuWidth;
-    double menuHeight =
-        (widget.menuHeight + _getDividerHeight()) * menusWidgets.length;
+    double menuHeight = (widget.menuHeight + _getDividerHeight()) * menusWidgets.length;
 
     ///get the container rect
     Rect bigRect = Rect.fromLTWH(
       widget.contentPadding.left,
       widget.contentPadding.top,
-      MediaQuery.of(context).size.width -
-          widget.contentPadding.left -
-          widget.contentPadding.right,
-      MediaQuery.of(context).size.height -
-          widget.contentPadding.top -
-          widget.contentPadding.bottom,
+      MediaQuery.of(context).size.width - widget.contentPadding.left - widget.contentPadding.right,
+      MediaQuery.of(context).size.height - widget.contentPadding.top - widget.contentPadding.bottom,
     );
 
     ///limit the rect
@@ -368,10 +362,21 @@ class _PopupMenuState extends State<PopupMenu> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            ///hover
             PopupAnimation(
               controller: _animationHoverController,
               child: widget.hover ?? const SizedBox(),
             ),
+
+            ///show child or not
+            if (widget.showChildTop)
+              Positioned(
+                left: offset.dx,
+                right: offset.dy,
+                child: IgnorePointer(
+                  child: widget.child,
+                ),
+              ),
 
             ///use position
             Positioned(
@@ -408,11 +413,9 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   ///build constrain rect
-  Offset constrainRectWithinRect(
-      Rect bigRect, Rect smallRect, Offset smallRectOffset) {
+  Offset constrainRectWithinRect(Rect bigRect, Rect smallRect, Offset smallRectOffset) {
     // 计算小 Rect 右下角的 Offset
-    Offset smallRectBottomRight =
-        smallRectOffset + Offset(smallRect.width, smallRect.height);
+    Offset smallRectBottomRight = smallRectOffset + Offset(smallRect.width, smallRect.height);
 
     // 计算小 Rect 能够移动的最大 Offset
     double maxDx = bigRect.right - smallRect.width;

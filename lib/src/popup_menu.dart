@@ -147,7 +147,9 @@ class _PopupMenuState extends State<PopupMenu> {
   final PopupAnimationController _animationHoverController = PopupAnimationController();
 
   ///global key
-  final GlobalKey _globalKey = GlobalKey();
+  final GlobalKey _currentKey = GlobalKey();
+  Rect _currentRect = Rect.zero;
+  bool _currentIsPop = false;
 
   ///overlay is show or not
   OverlayEntry? _currentShowOverlay;
@@ -189,9 +191,19 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   @override
+  void dispose() {
+    _menuController?.removeListener(_listener);
+
+    ///remove overlay
+    _currentShowOverlay?.remove();
+    _currentShowOverlay = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      key: _globalKey,
+      key: _currentKey,
       behavior: HitTestBehavior.translucent,
       onLongPress: widget.triggerType == PopupMenuTriggerType.onLongPress
           ? () {
@@ -203,24 +215,38 @@ class _PopupMenuState extends State<PopupMenu> {
               _menuController?.show();
             }
           : null,
-      child: widget.child,
+      child: _buildChild(),
     );
   }
 
-  @override
-  void dispose() {
-    _menuController?.removeListener(_listener);
-
-    ///remove overlay
-    _currentShowOverlay?.remove();
-    _currentShowOverlay = null;
-    super.dispose();
+  ///build child
+  Widget _buildChild() {
+    if (widget.showChildTop && _currentIsPop) {
+      return SizedBox(
+        width: _currentRect.width,
+        height: _currentRect.height,
+      );
+    } else {
+      return widget.child;
+    }
   }
 
   ///show overlay
   void _showOverlay() {
     ///if overlay is not show ,show overlay
     if (_currentShowOverlay == null) {
+      ///get child size and location
+      RenderBox renderBox = _currentKey.currentContext?.findRenderObject() as RenderBox;
+      final Offset offset = renderBox.localToGlobal(Offset.zero);
+      _currentRect = Rect.fromLTWH(offset.dx, offset.dy, renderBox.size.width, renderBox.size.height);
+
+      ///current is pop
+      _currentIsPop = true;
+      if (mounted) {
+        setState(() {});
+      }
+
+      ///show overlay later
       final OverlayState overlay = Overlay.of(context);
       _currentShowOverlay = OverlayEntry(
         builder: (context) => Positioned(
@@ -287,12 +313,8 @@ class _PopupMenuState extends State<PopupMenu> {
 
   ///build content
   Widget _buildContent() {
-    ///get render box
-    ///get render box
-    RenderBox renderBox = _globalKey.currentContext?.findRenderObject() as RenderBox;
-
     ///offset
-    final offset = renderBox.localToGlobal(Offset.zero);
+    final Rect rect = _currentRect;
 
     ///build menus
     List<Widget> menusWidgets = widget.menusBuilder(context, _menuController!);
@@ -324,8 +346,8 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///get left and top
     Offset pos = Offset(
-      offset.dx - widget.menuWidth / 2 + renderBox.size.width / 2,
-      offset.dy + renderBox.size.height + 10,
+      rect.left - widget.menuWidth / 2 + rect.width / 2,
+      rect.top + rect.height + 10,
     );
 
     ///up or down
@@ -334,8 +356,8 @@ class _PopupMenuState extends State<PopupMenu> {
 
       ///get left and top
       pos = Offset(
-        offset.dx - widget.menuWidth / 2 + renderBox.size.width / 2,
-        offset.dy - menuHeight - 10,
+        rect.left - widget.menuWidth / 2 + rect.width / 2,
+        rect.top - menuHeight - 10,
       );
     }
 
@@ -346,10 +368,10 @@ class _PopupMenuState extends State<PopupMenu> {
     double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
 
     ///show or not
-    bool visible = offset.dx < MediaQuery.of(context).size.width &&
-        offset.dx + menuWidth > 0 &&
-        offset.dy < MediaQuery.of(context).size.height &&
-        offset.dy + menuHeight > 0 &&
+    bool visible = rect.left < MediaQuery.of(context).size.width &&
+        rect.left + menuWidth > 0 &&
+        rect.top < MediaQuery.of(context).size.height &&
+        rect.top + menuHeight > 0 &&
         menus.isNotEmpty;
 
     return Material(
@@ -370,12 +392,11 @@ class _PopupMenuState extends State<PopupMenu> {
 
             ///show child or not
             if (widget.showChildTop)
-              Positioned(
-                left: offset.dx,
-                right: offset.dy,
-                child: IgnorePointer(
-                  child: widget.child,
-                ),
+              Container(
+                margin: EdgeInsets.fromLTRB(rect.left, rect.top, 0, 0),
+                width: rect.width,
+                height: rect.height,
+                child: widget.child,
               ),
 
             ///use position
@@ -388,6 +409,12 @@ class _PopupMenuState extends State<PopupMenu> {
                   ///remove overlay
                   _currentShowOverlay?.remove();
                   _currentShowOverlay = null;
+
+                  ///current is pop
+                  _currentIsPop = false;
+                  if (mounted) {
+                    setState(() {});
+                  }
                 },
                 child: BubbleContainer(
                   width: widget.menuWidth,

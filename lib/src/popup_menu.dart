@@ -9,6 +9,11 @@ enum PopupMenuTriggerType {
   onLongPress,
 }
 
+enum PopupSubHeadAlign {
+  start,
+  end,
+}
+
 ///build menu
 typedef PopupMenuBuilder = List<Widget> Function(
     BuildContext context, PopupMenuController controller);
@@ -105,6 +110,7 @@ class PopupMenu extends StatefulWidget {
 
   final Widget? subHead;
   final double? subHeadHeight;
+  final PopupSubHeadAlign subHeadAlign;
 
   const PopupMenu({
     super.key,
@@ -131,6 +137,7 @@ class PopupMenu extends StatefulWidget {
     this.hover,
     this.subHead,
     this.subHeadHeight,
+    this.subHeadAlign = PopupSubHeadAlign.end,
   }) : assert((subHead == null && subHeadHeight == null) ||
             (subHead != null && subHeadHeight != null));
 
@@ -366,7 +373,8 @@ class _PopupMenuState extends State<PopupMenu> {
     );
 
     ///check which space is larger
-    bool showDown = (bigRect.height - rect.top - smallRect.height) >= rect.top;
+    bool showDown =
+        (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
 
     ///position
     Offset pos;
@@ -398,6 +406,9 @@ class _PopupMenuState extends State<PopupMenu> {
         rect.top + menuHeight > 0 &&
         menus.isNotEmpty;
 
+    double showPosX = posLimit.dx - (widget.offsetDx ?? 0);
+    double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
+
     return Material(
       color: Colors.transparent,
       type: MaterialType.transparency,
@@ -413,8 +424,8 @@ class _PopupMenuState extends State<PopupMenu> {
 
             ///use position
             Positioned(
-              left: posLimit.dx - (widget.offsetDx ?? 0),
-              top: posLimit.dy - (widget.offsetDy ?? 0),
+              left: showPosX,
+              top: showPosY,
               child: PopupAnimation(
                 controller: _animationController,
                 onHide: () {
@@ -460,8 +471,7 @@ class _PopupMenuState extends State<PopupMenu> {
   ///menus
   Widget _buildOverlayPopContent(
       bool showDown, double delta, List<Widget> menus) {
-    ///content
-    Widget contentWidget = BubbleContainer(
+    Widget content = BubbleContainer(
       width: widget.menuWidth,
       shadowColor: widget.shadowColor,
       shadowElevation: widget.shadowElevation,
@@ -479,24 +489,50 @@ class _PopupMenuState extends State<PopupMenu> {
       ),
     );
 
-    ///sub head
+    ///sub head is null
     if (widget.subHead == null) {
-      return contentWidget;
-    } else {
-      return showDown
-          ? Column(
-              children: [
-                widget.subHead!,
-                contentWidget,
-              ],
-            )
-          : Column(
-              children: [
-                contentWidget,
-                widget.subHead!,
-              ],
-            );
+      return content;
     }
+
+    return showDown
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: widget.menuWidth,
+                height: widget.subHeadHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    widget.subHeadAlign == PopupSubHeadAlign.start
+                        ? Positioned(left: 0, top: 0, child: widget.subHead!)
+                        : Positioned(right: 0, top: 0, child: widget.subHead!),
+                  ],
+                ),
+              ),
+              content,
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              content,
+              SizedBox(
+                width: widget.menuWidth,
+                height: widget.subHeadHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    widget.subHeadAlign == PopupSubHeadAlign.start
+                        ? Positioned(left: 0, top: 0, child: widget.subHead!)
+                        : Positioned(right: 0, top: 0, child: widget.subHead!),
+                  ],
+                ),
+              ),
+            ],
+          );
   }
 
   ///build constrain rect

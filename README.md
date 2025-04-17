@@ -19,35 +19,45 @@ Below is an example of how to build a pop-up menu in Flutter using a custom `Pop
 /// Build pop-up menu
 Widget _buildPopMenu(Widget child) {
   return PopupMenu(
-    menusBuilder: (context, controller) {
-      return [
-        PopupMenuBtn(
-          text: "Function One",
-          icon: const Icon(
-            Icons.scale,
-            color: Colors.white,
-            size: 16,
-          ),
-          onTap: () {
-            controller.hide();
-          },
-        ),
-        PopupMenuBtn(
-          text: "Function Two",
-          icon: const Icon(
-            Icons.add,
-            color: Colors.white,
-            size: 16,
-          ),
-          onTap: () {
-            controller.hide();
-          },
-        ),
-      ];
-    },
-    menuHeight: 40,
-    child: child,
-  );
+      controller: _controller,
+      translucent: true,
+      barrierDismissible: true,
+      bubbleOptions: const PopupBubbleOptions(
+        bubbleShadowColor: Colors.black,
+        bubbleShadowElevation: 5.0,
+      ),
+      menusBuilder: (context, controller) {
+        return PopupMenuWithOptions(
+          itemWidth: 120,
+          itemHeight: 40,
+          children: [
+            PopupMenuBtn(
+              text: "Function One",
+              icon: const Icon(
+                Icons.scale,
+                color: Colors.white,
+                size: 16,
+              ),
+              onTap: () {
+                controller.hide();
+              },
+            ),
+            PopupMenuBtn(
+              text: "Function Two",
+              icon: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 16,
+              ),
+              onTap: () {
+                controller.hide();
+              },
+            ),
+          ],
+        );
+      },
+      child: child,
+    );
 }
 
 

@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'bubble_container.dart';
 import 'popup_animation.dart';
@@ -24,15 +22,70 @@ enum PopupMenuAlign {
   end,
 }
 
+///bubble options
+class PopupBubbleOptions {
+  final Color bubbleColor;
+  final BorderRadius bubbleRadius;
+  final Color? bubbleShadowColor;
+  final double bubbleShadowElevation;
+  final bool bubbleShadowOccluder;
+
+  const PopupBubbleOptions({
+    this.bubbleColor = const Color(0xFF5A5B5E),
+    this.bubbleRadius = const BorderRadius.all(Radius.circular(8)),
+    this.bubbleShadowColor,
+    this.bubbleShadowElevation = 5.0,
+    this.bubbleShadowOccluder = true,
+  });
+}
+
+///sub head options
+class PopupMenuWithOptions {
+  double itemHeight;
+  double itemWidth;
+  List<Widget> children;
+
+  PopupMenuWithOptions({
+    this.itemWidth = 120,
+    this.itemHeight = 40,
+    required this.children,
+  });
+}
+
+///sub head options
+class PopupSubHeadWithOptions {
+  double height;
+  double width;
+  PopupMenuSubHeadAlign align;
+  Widget child;
+
+  PopupSubHeadWithOptions({
+    this.width = double.infinity,
+    this.align = PopupMenuSubHeadAlign.end,
+    required this.height,
+    required this.child,
+  });
+}
+
 ///build menu
-typedef PopupMenuBuilder = List<Widget> Function(
-    BuildContext context, PopupMenuController controller);
+typedef PopupMenuBuilder = PopupMenuWithOptions Function(
+  BuildContext context,
+  PopupMenuController controller,
+);
+
+///build sub head
+typedef PopupSubHeadBuilder = PopupSubHeadWithOptions Function(
+  BuildContext context,
+  PopupMenuController controller,
+);
 
 ///pop feed animation alpha controller
 class PopupMenuController {
   static const int _eventShow = 1;
   static const int _eventHide = 2;
+  static const int _eventRebuild = 3;
 
+  ///listeners
   final List<ValueChanged<int>> _listeners = [];
 
   ///is show pop
@@ -48,6 +101,11 @@ class PopupMenuController {
   void hide() {
     _isShowPop = false;
     notifyListeners(_eventHide);
+  }
+
+  ///rebuild items and subviews
+  void rebuild() {
+    notifyListeners(_eventRebuild);
   }
 
   //notify listener
@@ -71,20 +129,17 @@ class PopupMenu extends StatefulWidget {
   ///controller
   final PopupMenuController? controller;
 
+  ///menus
+  final PopupMenuBuilder menusBuilder;
+
+  ///sub head
+  final PopupSubHeadBuilder? subHeadBuilder;
+
   ///divider
   final Color dividerColor;
 
-  ///menu width
-  final double menuWidth;
-
-  ///menu width
-  final double menuHeight;
-
   ///child widget
   final Widget child;
-
-  ///menus
-  final PopupMenuBuilder menusBuilder;
 
   final double? offsetDx;
   final double? offsetDy;
@@ -110,30 +165,17 @@ class PopupMenu extends StatefulWidget {
   ///align
   final PopupMenuAlign align;
 
-  ///sub head
-  final Widget? subHead;
-  final double? subHeadHeight;
-  final PopupMenuSubHeadAlign subHeadAlign;
-
-  ///radius
-  ///background color
-  final Color bubbleColor;
-  final BorderRadius bubbleRadius;
-  final Color? bubbleShadowColor;
-  final double bubbleShadowElevation;
-  final bool bubbleShadowOccluder;
-
-  ///if this set, other param was disable
+  ///bubble Decoration
   final Decoration? bubbleDecoration;
+
+  ///bubble options
+  final PopupBubbleOptions bubbleOptions;
 
   const PopupMenu({
     super.key,
     this.controller,
     required this.child,
     required this.menusBuilder,
-    this.menuWidth = 120,
-    this.menuHeight = 40,
-    this.bubbleColor = const Color(0xFF5A5B5E),
     this.dividerColor = Colors.black87,
     this.triggerType = PopupMenuTriggerType.onLongPress,
     this.barrierDismissible = true,
@@ -142,18 +184,12 @@ class PopupMenu extends StatefulWidget {
     this.offsetDx,
     this.offsetDy,
     this.contentPadding = EdgeInsets.zero,
-    this.bubbleShadowColor,
-    this.bubbleShadowElevation = 5,
-    this.bubbleShadowOccluder = true,
     this.hover,
-    this.subHead,
-    this.subHeadHeight,
-    this.subHeadAlign = PopupMenuSubHeadAlign.end,
+    this.subHeadBuilder,
     this.align = PopupMenuAlign.center,
-    this.bubbleRadius = const BorderRadius.all(Radius.circular(8)),
+    this.bubbleOptions = const PopupBubbleOptions(),
     this.bubbleDecoration,
-  }) : assert((subHead == null && subHeadHeight == null) ||
-            (subHead != null && subHeadHeight != null));
+  });
 
   @override
   State<StatefulWidget> createState() {
@@ -195,6 +231,9 @@ class _PopupMenuState extends State<PopupMenu> {
       }
       if (event == PopupMenuController._eventShow) {
         _showOverlay();
+      }
+      if (event == PopupMenuController._eventRebuild) {
+        _currentShowOverlay?.markNeedsBuild();
       }
     };
 
@@ -350,21 +389,24 @@ class _PopupMenuState extends State<PopupMenu> {
 
   ///build content
   Widget _buildContent() {
+    ///build menus
+    PopupMenuWithOptions menus = widget.menusBuilder(context, _menuController!);
+    menus.children = createListWithSeparators(menus.children, _buildDivider());
+
+    ///sub head option
+    PopupSubHeadWithOptions? header;
+    if (widget.subHeadBuilder != null) {
+      header = widget.subHeadBuilder!(context, _menuController!);
+    }
+
     ///offset
     final Rect rect = _currentRect;
 
-    ///build menus
-    List<Widget> menusWidgets = widget.menusBuilder(context, _menuController!);
-
-    ///menus
-    List<Widget> menus =
-        createListWithSeparators(menusWidgets, _buildDivider());
-
     ///width and height
-    double menuWidth = widget.menuWidth;
+    double menuWidth = menus.itemWidth;
     double menuHeight =
-        (widget.menuHeight + _getDividerHeight()) * menusWidgets.length +
-            (widget.subHeadHeight ?? 0);
+        (menus.itemHeight + _getDividerHeight()) * menus.children.length +
+            (header?.height ?? 0);
 
     ///get the container rect
     Rect bigRect = Rect.fromLTWH(
@@ -396,13 +438,13 @@ class _PopupMenuState extends State<PopupMenu> {
     ///get left and top
     if (showDown) {
       pos = Offset(
-        rect.left - widget.menuWidth / 2 + rect.width / 2,
+        rect.left - menus.itemWidth / 2 + rect.width / 2,
         rect.top + rect.height + 10,
       );
     } else {
       ///get left and top
       pos = Offset(
-        rect.left - widget.menuWidth / 2 + rect.width / 2,
+        rect.left - menus.itemWidth / 2 + rect.width / 2,
         rect.top - menuHeight - 10,
       );
     }
@@ -411,14 +453,14 @@ class _PopupMenuState extends State<PopupMenu> {
     Offset posLimit = constrainRectWithinRect(bigRect, smallRect, pos);
 
     ///delta offset
-    double delta = ((pos.dx + widget.menuWidth / 2) - posLimit.dx);
+    double delta = ((pos.dx + menus.itemWidth / 2) - posLimit.dx);
 
     ///show or not
     bool visible = rect.left < MediaQuery.of(context).size.width &&
         rect.left + menuWidth > 0 &&
         rect.top < MediaQuery.of(context).size.height &&
         rect.top + menuHeight > 0 &&
-        menus.isNotEmpty;
+        menus.children.isNotEmpty;
 
     double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
     double showPosX = 0;
@@ -429,7 +471,7 @@ class _PopupMenuState extends State<PopupMenu> {
         showPosX = rect.left;
         break;
       case PopupMenuAlign.end:
-        showPosX = rect.right - widget.menuWidth;
+        showPosX = rect.right - menus.itemWidth;
         break;
       case PopupMenuAlign.center:
         showPosX = posLimit.dx - (widget.offsetDx ?? 0);
@@ -448,25 +490,16 @@ class _PopupMenuState extends State<PopupMenu> {
           children: [
             _buildOverlayHover(),
             _buildOverlayChild(),
-
-            ///use position
-            Positioned(
-              left: showPosX,
-              top: showPosY,
-              child: PopupAnimation(
-                controller: _animationController,
-                onHide: () {
-                  ///remove overlay
-                  _currentShowOverlay?.remove();
-                  _currentShowOverlay = null;
-                  _currentIsPop = false;
-                  if (mounted) {
-                    setState(() {});
-                  }
-                },
-                child: _buildOverlayPopContent(showDown, delta, menus),
+            _buildOverLayPop(
+              Offset(
+                showPosX,
+                showPosY,
               ),
-            ),
+              showDown,
+              delta,
+              menus,
+              header,
+            )
           ],
         ),
       ),
@@ -484,13 +517,15 @@ class _PopupMenuState extends State<PopupMenu> {
   ///show child or not
   Widget _buildOverlayChild() {
     if (widget.showChildTop) {
-      return Container(
-        margin: EdgeInsets.fromLTRB(
-            max(0, _currentRect.left), max(0, _currentRect.top), 0, 0),
-        width: _currentRect.width,
-        height: _currentRect.height,
-        child: IgnorePointer(
-          child: widget.child,
+      return Positioned(
+        left: _currentRect.left,
+        top: _currentRect.top,
+        child: SizedBox(
+          width: _currentRect.width,
+          height: _currentRect.height,
+          child: IgnorePointer(
+            child: widget.child,
+          ),
         ),
       );
     } else {
@@ -498,45 +533,76 @@ class _PopupMenuState extends State<PopupMenu> {
     }
   }
 
+  ///build overlay pop
+  Widget _buildOverLayPop(
+    Offset offset,
+    bool showDown,
+    double delta,
+    PopupMenuWithOptions menus,
+    PopupSubHeadWithOptions? header,
+  ) {
+    return Positioned(
+      left: offset.dx,
+      top: offset.dy,
+      child: PopupAnimation(
+        controller: _animationController,
+        onHide: () {
+          _currentShowOverlay?.remove();
+          _currentShowOverlay = null;
+          _currentIsPop = false;
+          if (mounted) {
+            setState(() {});
+          }
+        },
+        child: _buildOverlayPopContent(
+          showDown,
+          delta,
+          menus,
+          header,
+        ),
+      ),
+    );
+  }
+
   ///menus
-  Widget _buildOverlayPopContent(
-      bool showDown, double delta, List<Widget> menus) {
+  Widget _buildOverlayPopContent(bool showDown, double delta,
+      PopupMenuWithOptions menus, PopupSubHeadWithOptions? subHead) {
     ///bubble
     Widget content;
     if (widget.bubbleDecoration != null) {
       content = Container(
-        width: widget.menuWidth,
+        width: menus.itemWidth,
         decoration: widget.bubbleDecoration,
         child: Column(
           verticalDirection:
               showDown ? VerticalDirection.down : VerticalDirection.up,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: menus,
+          children: menus.children,
         ),
       );
     } else {
       content = BubbleContainer(
-        width: widget.menuWidth,
-        radius: widget.bubbleRadius,
-        color: widget.bubbleColor,
         type: showDown ? BubbleType.top : BubbleType.bottom,
+        width: menus.itemWidth,
         deltaOffset: delta,
-        shadowColor: widget.bubbleShadowColor,
-        shadowElevation: widget.bubbleShadowElevation,
-        shadowOccluder: widget.bubbleShadowOccluder,
+        radius: widget.bubbleOptions.bubbleRadius,
+        color: widget.bubbleOptions.bubbleColor,
+        shadowColor: widget.bubbleOptions.bubbleShadowColor,
+        shadowElevation: widget.bubbleOptions.bubbleShadowElevation,
+        shadowOccluder: widget.bubbleOptions.bubbleShadowOccluder,
         child: Column(
           verticalDirection:
               showDown ? VerticalDirection.down : VerticalDirection.up,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: menus,
+          children: menus.children,
         ),
       );
     }
 
     ///sub head is null
-    if (widget.subHead == null) {
+    if (subHead == null) {
       return content;
     }
 
@@ -547,14 +613,14 @@ class _PopupMenuState extends State<PopupMenu> {
           showDown ? VerticalDirection.down : VerticalDirection.up,
       children: [
         SizedBox(
-          width: widget.menuWidth,
-          height: widget.subHeadHeight,
+          width: subHead.width,
+          height: subHead.height,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              widget.subHeadAlign == PopupMenuSubHeadAlign.start
-                  ? Positioned(left: 0, top: 0, child: widget.subHead!)
-                  : Positioned(right: 0, top: 0, child: widget.subHead!),
+              subHead.align == PopupMenuSubHeadAlign.start
+                  ? Positioned(left: 0, top: 0, child: subHead.child)
+                  : Positioned(right: 0, top: 0, child: subHead.child),
             ],
           ),
         ),

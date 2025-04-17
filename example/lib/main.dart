@@ -104,35 +104,40 @@ class _MyHomePageState extends State<MyHomePage> {
       controller: _controller,
       translucent: true,
       barrierDismissible: true,
-      bubbleShadowColor: Colors.black,
-      bubbleShadowElevation: 5.0,
+      bubbleOptions: const PopupBubbleOptions(
+        bubbleShadowColor: Colors.black,
+        bubbleShadowElevation: 5.0,
+      ),
       menusBuilder: (context, controller) {
-        return [
-          PopupMenuBtn(
-            text: "Function One",
-            icon: const Icon(
-              Icons.scale,
-              color: Colors.white,
-              size: 16,
+        return PopupMenuWithOptions(
+          itemWidth: 120,
+          itemHeight: 40,
+          children: [
+            PopupMenuBtn(
+              text: "Function One",
+              icon: const Icon(
+                Icons.scale,
+                color: Colors.white,
+                size: 16,
+              ),
+              onTap: () {
+                controller.hide();
+              },
             ),
-            onTap: () {
-              controller.hide();
-            },
-          ),
-          PopupMenuBtn(
-            text: "Function Two",
-            icon: const Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 16,
+            PopupMenuBtn(
+              text: "Function Two",
+              icon: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 16,
+              ),
+              onTap: () {
+                controller.hide();
+              },
             ),
-            onTap: () {
-              controller.hide();
-            },
-          ),
-        ];
+          ],
+        );
       },
-      menuHeight: 40,
       child: child,
     );
   }

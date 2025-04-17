@@ -1,3 +1,3 @@
-## 1.0.15
+## 1.0.16
 
-1. Bugs fixed for margin value.
+1. Add rebuild function for controller.

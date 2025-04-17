@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'bubble_container.dart';
 import 'popup_animation.dart';
 import 'bubble_painter.dart';
+import 'dart:math';
 
 ///type
 enum PopupMenuTriggerType {
@@ -60,10 +61,10 @@ class PopupSubHeadWithOptions {
   Widget child;
 
   PopupSubHeadWithOptions({
-    this.width = double.infinity,
     this.align = PopupMenuSubHeadAlign.end,
     required this.height,
     required this.child,
+    required this.width,
   });
 }
 
@@ -391,7 +392,6 @@ class _PopupMenuState extends State<PopupMenu> {
   Widget _buildContent() {
     ///build menus
     PopupMenuWithOptions menus = widget.menusBuilder(context, _menuController!);
-    menus.children = createListWithSeparators(menus.children, _buildDivider());
 
     ///sub head option
     PopupSubHeadWithOptions? header;
@@ -403,7 +403,7 @@ class _PopupMenuState extends State<PopupMenu> {
     final Rect rect = _currentRect;
 
     ///width and height
-    double menuWidth = menus.itemWidth;
+    double menuWidth = max(menus.itemWidth, header?.width ?? 0);
     double menuHeight =
         (menus.itemHeight + _getDividerHeight()) * menus.children.length +
             (header?.height ?? 0);
@@ -438,13 +438,13 @@ class _PopupMenuState extends State<PopupMenu> {
     ///get left and top
     if (showDown) {
       pos = Offset(
-        rect.left - menus.itemWidth / 2 + rect.width / 2,
+        rect.left - menuWidth / 2 + rect.width / 2,
         rect.top + rect.height + 10,
       );
     } else {
       ///get left and top
       pos = Offset(
-        rect.left - menus.itemWidth / 2 + rect.width / 2,
+        rect.left - menuWidth / 2 + rect.width / 2,
         rect.top - menuHeight - 10,
       );
     }
@@ -471,7 +471,7 @@ class _PopupMenuState extends State<PopupMenu> {
         showPosX = rect.left;
         break;
       case PopupMenuAlign.end:
-        showPosX = rect.right - menus.itemWidth;
+        showPosX = rect.right - menuWidth;
         break;
       case PopupMenuAlign.center:
         showPosX = posLimit.dx - (widget.offsetDx ?? 0);
@@ -578,7 +578,7 @@ class _PopupMenuState extends State<PopupMenu> {
               showDown ? VerticalDirection.down : VerticalDirection.up,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: menus.children,
+          children: createListWithSeparators(menus.children, _buildDivider()),
         ),
       );
     } else {
@@ -596,7 +596,7 @@ class _PopupMenuState extends State<PopupMenu> {
               showDown ? VerticalDirection.down : VerticalDirection.up,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: menus.children,
+          children: createListWithSeparators(menus.children, _buildDivider()),
         ),
       );
     }
@@ -607,22 +607,17 @@ class _PopupMenuState extends State<PopupMenu> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       verticalDirection:
           showDown ? VerticalDirection.down : VerticalDirection.up,
+      crossAxisAlignment: subHead.align == PopupMenuSubHeadAlign.start
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
       children: [
         SizedBox(
           width: subHead.width,
           height: subHead.height,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              subHead.align == PopupMenuSubHeadAlign.start
-                  ? Positioned(left: 0, top: 0, child: subHead.child)
-                  : Positioned(right: 0, top: 0, child: subHead.child),
-            ],
-          ),
+          child: subHead.child,
         ),
         content,
       ],

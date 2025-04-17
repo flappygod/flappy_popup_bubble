@@ -1,3 +1,3 @@
-## 1.0.17
+## 1.0.18
 
-1. Bugs fixed which may cause void screen.
+1. Add onPopupHide and onPopupShow listener when menu show and hide.

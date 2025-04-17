@@ -172,6 +172,10 @@ class PopupMenu extends StatefulWidget {
   ///bubble options
   final PopupBubbleOptions bubbleOptions;
 
+  final VoidCallback? onPopupShow;
+
+  final VoidCallback? onPopupHide;
+
   const PopupMenu({
     super.key,
     this.controller,
@@ -190,6 +194,8 @@ class PopupMenu extends StatefulWidget {
     this.align = PopupMenuAlign.center,
     this.bubbleOptions = const PopupBubbleOptions(),
     this.bubbleDecoration,
+    this.onPopupShow,
+    this.onPopupHide,
   });
 
   @override
@@ -305,6 +311,10 @@ class _PopupMenuState extends State<PopupMenu> {
   void _showOverlay() {
     ///if overlay is not show ,show overlay
     if (_currentShowOverlay == null) {
+      if (widget.onPopupShow != null) {
+        widget.onPopupShow!();
+      }
+
       ///get child size and location
       RenderBox renderBox =
           _currentKey.currentContext?.findRenderObject() as RenderBox;
@@ -551,6 +561,9 @@ class _PopupMenuState extends State<PopupMenu> {
           _currentIsPop = false;
           if (mounted) {
             setState(() {});
+          }
+          if (widget.onPopupHide != null) {
+            widget.onPopupHide!();
           }
         },
         child: _buildOverlayPopContent(

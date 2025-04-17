@@ -459,8 +459,7 @@ class _PopupMenuState extends State<PopupMenu> {
     bool visible = rect.left < MediaQuery.of(context).size.width &&
         rect.left + menuWidth > 0 &&
         rect.top < MediaQuery.of(context).size.height &&
-        rect.top + menuHeight > 0 &&
-        menus.children.isNotEmpty;
+        rect.top + menuHeight > 0;
 
     double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
     double showPosX = 0;

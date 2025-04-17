@@ -1,3 +1,3 @@
-## 1.0.16
+## 1.0.17
 
-1. Add rebuild function for controller.
+1. Bugs fixed which may cause void screen.

@@ -145,6 +145,8 @@ class PopupMenu extends StatefulWidget {
   final double? offsetDx;
   final double? offsetDy;
 
+  final double offsetSpace;
+
   ///translucent
   final bool translucent;
 
@@ -172,8 +174,10 @@ class PopupMenu extends StatefulWidget {
   ///bubble options
   final PopupBubbleOptions bubbleOptions;
 
+  ///show
   final VoidCallback? onPopupShow;
 
+  ///hide
   final VoidCallback? onPopupHide;
 
   const PopupMenu({
@@ -188,6 +192,7 @@ class PopupMenu extends StatefulWidget {
     this.translucent = false,
     this.offsetDx,
     this.offsetDy,
+    this.offsetSpace = 10,
     this.contentPadding = EdgeInsets.zero,
     this.hover,
     this.subHeadBuilder,
@@ -449,13 +454,13 @@ class _PopupMenuState extends State<PopupMenu> {
     if (showDown) {
       pos = Offset(
         rect.left - menuWidth / 2 + rect.width / 2,
-        rect.top + rect.height + 10,
+        rect.top + rect.height + widget.offsetSpace,
       );
     } else {
       ///get left and top
       pos = Offset(
         rect.left - menuWidth / 2 + rect.width / 2,
-        rect.top - menuHeight - 10,
+        rect.top - menuHeight - widget.offsetSpace,
       );
     }
 

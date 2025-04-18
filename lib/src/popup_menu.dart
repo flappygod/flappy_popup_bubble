@@ -445,7 +445,7 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///check which space is larger
     bool showDown =
-        (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
+        (bigRect.bottom - rect.bottom) >= (rect.top - bigRect.top);
 
     ///position
     Offset pos;

@@ -1,3 +1,3 @@
-## 1.0.18
+## 1.0.19
 
-1. Add onPopupHide and onPopupShow listener when menu show and hide.
+1. Add offsetSpace for customize the offset.

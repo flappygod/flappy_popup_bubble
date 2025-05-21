@@ -1,3 +1,3 @@
-## 1.1.0
+## 1.1.1
 
-1. change builder , auto measure menu child width and height. 
+1. fix a bug that may cause always show the same menu. 

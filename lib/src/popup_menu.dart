@@ -610,6 +610,9 @@ class _PopupMenuState extends State<PopupMenu> {
           _currentShowOverlay?.remove();
           _currentShowOverlay = null;
           _currentIsPop = false;
+          _currentPopupRect = null;
+          _cacheMenus = null;
+          _cacheSubHead = null;
           if (mounted) {
             setState(() {});
           }

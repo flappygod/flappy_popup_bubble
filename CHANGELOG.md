@@ -1,3 +1,3 @@
-## 1.0.19
+## 1.1.0
 
-1. Add offsetSpace for customize the offset.
+1. change builder , auto measure menu child width and height. 

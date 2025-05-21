@@ -102,7 +102,17 @@ class _PopupAnimationState extends State<PopupAnimation>
   @override
   Widget build(BuildContext context) {
     return _animation.value == 0
-        ? const SizedBox()
+        ? Visibility(
+            visible: false,
+            maintainSemantics: true,
+            maintainAnimation: true,
+            maintainSize: true,
+            maintainState: true,
+            child: Opacity(
+              opacity: _animation.value,
+              child: widget.child ?? const SizedBox(),
+            ),
+          )
         : Opacity(
             opacity: _animation.value,
             child: widget.child ?? const SizedBox(),

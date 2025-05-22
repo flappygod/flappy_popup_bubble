@@ -33,7 +33,7 @@ class PopupMenuBtn extends StatelessWidget {
     this.icon,
     this.textStyle,
     this.onTap,
-    this.width = 200,
+    this.width = 120,
     this.height = 40,
     this.padding,
   });

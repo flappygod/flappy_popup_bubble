@@ -584,7 +584,10 @@ class _PopupMenuState extends State<PopupMenu> {
           width: _currentChildRect.width,
           height: _currentChildRect.height,
           child: IgnorePointer(
-            child: child,
+            child: HeroMode(
+              enabled: false,
+              child: child,
+            ),
           ),
         ),
       );

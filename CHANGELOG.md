@@ -1,3 +1,3 @@
-## 1.1.2
+## 1.1.3
 
-1. Change some default value. 
+1. set hero mode false to avoid bugs. 

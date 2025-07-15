@@ -1,3 +1,3 @@
-## 1.1.3
+## 1.1.4
 
-1. set hero mode false to avoid bugs. 
+1. add isShow state in controller.

@@ -1,3 +1,3 @@
-## 1.1.4
+## 1.1.5
 
-1. add isShow state in controller.
+1. Ignore un need rebuild to avoid shake.

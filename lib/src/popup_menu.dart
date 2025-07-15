@@ -242,9 +242,6 @@ class _PopupMenuState extends State<PopupMenu> {
       }
       if (event == PopupMenuController._eventRebuild) {
         ///清空
-        _currentPopupRect = null;
-
-        ///清空
         _cacheMenus = null;
         _cacheSubHead = null;
 
@@ -264,20 +261,22 @@ class _PopupMenuState extends State<PopupMenu> {
   void _measurePopupMenuSize() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ///如果rect已经存在了，已经拿到了
-      if (_currentPopupRect != null) {
-        return;
-      }
       RenderBox? renderBox =
           _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
       final Offset offset =
           renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-      _currentPopupRect = Rect.fromLTWH(
+      Rect newRect = Rect.fromLTWH(
         offset.dx,
         offset.dy,
         renderBox?.size.width ?? 0,
         renderBox?.size.height ?? 0,
       );
-      _currentShowOverlay?.markNeedsBuild();
+
+      ///不相等进行刷新
+      if (_currentPopupRect == null || !newRect.overlaps(_currentPopupRect!)) {
+        _currentPopupRect = newRect;
+        _currentShowOverlay?.markNeedsBuild();
+      }
     });
   }
 

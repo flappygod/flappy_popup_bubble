@@ -6,6 +6,7 @@ import 'dart:math';
 
 ///type
 enum PopupMenuTriggerType {
+  none,
   onTap,
   onLongPress,
 }

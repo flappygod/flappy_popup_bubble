@@ -72,6 +72,10 @@ class PopupMenuController {
   ///is show pop
   bool _isShowPop = false;
 
+  bool isShow() {
+    return _isShowPop;
+  }
+
   ///show menu
   void show() {
     _isShowPop = true;
@@ -613,6 +617,7 @@ class _PopupMenuState extends State<PopupMenu> {
         onHide: () {
           _currentShowOverlay?.remove();
           _currentShowOverlay = null;
+          widget.controller?._isShowPop = false;
           _currentIsPop = false;
           _currentPopupRect = null;
           _cacheMenus = null;

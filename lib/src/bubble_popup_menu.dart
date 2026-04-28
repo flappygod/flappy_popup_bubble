@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
 import 'bubble_container.dart';
-import 'popup_animation.dart';
+import 'bubble_popup_animation.dart';
 import 'bubble_painter.dart';
 import 'dart:math';
 
 ///type
-enum PopupMenuTriggerType {
+enum BubblePopupMenuTriggerType {
   none,
   onTap,
   onLongPress,
 }
 
 ///sub head align
-enum PopupMenuSubHeadAlign {
+enum BubblePopupMenuSubHeadAlign {
   start,
+  center,
   end,
 }
 
 ///sub head align
-enum PopupMenuAlign {
+enum BubblePopupMenuAlign {
   start,
   center,
   end,
@@ -30,27 +31,40 @@ class PopupBubbleOptions {
   final BorderRadius bubbleRadius;
   final Color? bubbleShadowColor;
   final double bubbleShadowElevation;
-  final bool bubbleShadowOccluder;
 
   const PopupBubbleOptions({
-    this.bubbleColor = const Color(0xFF5A5B5E),
+    this.bubbleColor = Colors.white,
     this.bubbleRadius = const BorderRadius.all(Radius.circular(8)),
-    this.bubbleShadowColor,
+    this.bubbleShadowColor = Colors.black38,
     this.bubbleShadowElevation = 5.0,
-    this.bubbleShadowOccluder = true,
   });
 }
 
+///popup menu background
+class PopupMenuBackground {
+  final PopupBubbleOptions? bubbleOptions;
+  final Decoration? decoration;
+
+  const PopupMenuBackground.bubble({
+    PopupBubbleOptions options = const PopupBubbleOptions(),
+  })  : bubbleOptions = options,
+        decoration = null;
+
+  const PopupMenuBackground.decoration(
+    Decoration this.decoration,
+  ) : bubbleOptions = null;
+}
+
 ///build menu
-typedef PopupMenuBuilder = List<Widget> Function(
+typedef BubblePopupMenuBuilder = List<Widget> Function(
   BuildContext context,
-  PopupMenuController controller,
+  BubblePopupMenuController controller,
 );
 
 ///build sub head
-typedef PopupSubHeadBuilder = Widget Function(
+typedef PopupMenuSubHeadBuilder = Widget Function(
   BuildContext context,
-  PopupMenuController controller,
+  BubblePopupMenuController controller,
 );
 
 ///overlay child builder
@@ -61,7 +75,7 @@ typedef PopupSubOverlayProxyChildBuilder = Widget Function(
 );
 
 ///pop feed animation alpha controller
-class PopupMenuController {
+class BubblePopupMenuController {
   static const int _eventShow = 1;
   static const int _eventHide = 2;
   static const int _eventRebuild = 3;
@@ -95,7 +109,7 @@ class PopupMenuController {
 
   //notify listener
   void notifyListeners(int data) {
-    for (ValueChanged<int> item in _listeners) {
+    for (final ValueChanged<int> item in _listeners.toList()) {
       item(data);
     }
   }
@@ -110,17 +124,17 @@ class PopupMenuController {
 }
 
 ///add popup menu
-class PopupMenu extends StatefulWidget {
+class BubblePopupMenu extends StatefulWidget {
   ///controller
-  final PopupMenuController? controller;
+  final BubblePopupMenuController? controller;
 
   ///menus
-  final PopupMenuBuilder menusBuilder;
+  final BubblePopupMenuBuilder menusBuilder;
 
   ///sub head
-  final PopupSubHeadBuilder? subHeadBuilder;
+  final PopupMenuSubHeadBuilder? subHeadBuilder;
   final PopupSubOverlayProxyChildBuilder? subOverlayChildProxyBuilder;
-  final PopupMenuSubHeadAlign subHeadAlign;
+  final BubblePopupMenuSubHeadAlign subHeadAlign;
 
   ///divider
   final Color dividerColor;
@@ -140,10 +154,13 @@ class PopupMenu extends StatefulWidget {
   final bool showChildTop;
 
   ///show on long press
-  final PopupMenuTriggerType triggerType;
+  final BubblePopupMenuTriggerType triggerType;
 
-  ///content padding
-  final EdgeInsets contentPadding;
+  ///padding used to keep popup within the overlay boundary
+  final EdgeInsets boundaryPadding;
+
+  ///popup content bubble padding
+  final EdgeInsets bubblePadding;
 
   ///touch to close
   final bool barrierDismissible;
@@ -152,13 +169,19 @@ class PopupMenu extends StatefulWidget {
   final Widget? hover;
 
   ///align
-  final PopupMenuAlign align;
+  final BubblePopupMenuAlign align;
 
-  ///bubble Decoration
-  final Decoration? bubbleDecoration;
+  ///background
+  final PopupMenuBackground background;
 
-  ///bubble options
-  final PopupBubbleOptions bubbleOptions;
+  /// enable anim scale
+  final bool bubbleAnimScaleEnable;
+
+  /// anim curve
+  final Curve bubbleAnimCurve;
+
+  /// anim duration
+  final Duration bubbleAnimDuration;
 
   ///show
   final VoidCallback? onPopupShow;
@@ -166,51 +189,55 @@ class PopupMenu extends StatefulWidget {
   ///hide
   final VoidCallback? onPopupHide;
 
-  const PopupMenu({
+  const BubblePopupMenu({
     super.key,
     this.controller,
     required this.child,
     required this.menusBuilder,
     this.dividerColor = Colors.black87,
-    this.triggerType = PopupMenuTriggerType.onLongPress,
+    this.triggerType = BubblePopupMenuTriggerType.onLongPress,
     this.barrierDismissible = true,
     this.showChildTop = false,
     this.translucent = false,
     this.offsetDx,
     this.offsetDy,
     this.offsetSpace = 10,
-    this.contentPadding = EdgeInsets.zero,
+    this.boundaryPadding = EdgeInsets.zero,
+    this.bubblePadding = EdgeInsets.zero,
     this.hover,
     this.subHeadBuilder,
-    this.subHeadAlign = PopupMenuSubHeadAlign.start,
+    this.subHeadAlign = BubblePopupMenuSubHeadAlign.start,
     this.subOverlayChildProxyBuilder,
-    this.align = PopupMenuAlign.center,
-    this.bubbleOptions = const PopupBubbleOptions(),
-    this.bubbleDecoration,
+    this.align = BubblePopupMenuAlign.center,
+    this.bubbleAnimScaleEnable = true,
+    this.bubbleAnimCurve = Curves.linear,
+    this.bubbleAnimDuration = const Duration(milliseconds: 240),
+    this.background = const PopupMenuBackground.bubble(),
     this.onPopupShow,
     this.onPopupHide,
-  });
+  }) : assert(
+          !translucent || !barrierDismissible,
+          'When translucent is true, barrierDismissible must be false.',
+        );
 
   @override
   State<StatefulWidget> createState() {
-    return _PopupMenuState();
+    return _BubblePopupMenuState();
   }
 }
 
-class _PopupMenuState extends State<PopupMenu> {
+class _BubblePopupMenuState extends State<BubblePopupMenu> {
   ///menu controller
-  PopupMenuController? _menuController;
+  BubblePopupMenuController? _menuController;
 
   ///listener
   late ValueChanged<int> _listener;
 
   ///controller
-  final PopupAnimationController _animationController =
-      PopupAnimationController();
+  final BubblePopupAnimationController _animationController = BubblePopupAnimationController();
 
   ///controller
-  final PopupAnimationController _animationHoverController =
-      PopupAnimationController();
+  final BubblePopupAnimationController _animationHoverController = BubblePopupAnimationController();
 
   ///global key
   final GlobalKey _currentChildKey = GlobalKey();
@@ -230,17 +257,17 @@ class _PopupMenuState extends State<PopupMenu> {
 
   @override
   void initState() {
-    _menuController = widget.controller ?? PopupMenuController();
+    _menuController = widget.controller ?? BubblePopupMenuController();
 
     ///add listener
     _listener = (event) {
-      if (event == PopupMenuController._eventHide) {
+      if (event == BubblePopupMenuController._eventHide) {
         _hideOverlay();
       }
-      if (event == PopupMenuController._eventShow) {
+      if (event == BubblePopupMenuController._eventShow) {
         _showOverlay();
       }
-      if (event == PopupMenuController._eventRebuild) {
+      if (event == BubblePopupMenuController._eventRebuild) {
         ///清空
         _cacheMenus = null;
         _cacheSubHead = null;
@@ -261,10 +288,8 @@ class _PopupMenuState extends State<PopupMenu> {
   void _measurePopupMenuSize() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ///如果rect已经存在了，已经拿到了
-      RenderBox? renderBox =
-          _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
-      final Offset offset =
-          renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+      RenderBox? renderBox = _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
+      final Offset offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
       Rect newRect = Rect.fromLTWH(
         offset.dx,
         offset.dy,
@@ -273,7 +298,7 @@ class _PopupMenuState extends State<PopupMenu> {
       );
 
       ///不相等进行刷新
-      if (_currentPopupRect == null || !newRect.overlaps(_currentPopupRect!)) {
+      if (_currentPopupRect == null || newRect != _currentPopupRect) {
         _currentPopupRect = newRect;
         _currentShowOverlay?.markNeedsBuild();
       }
@@ -293,10 +318,10 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   @override
-  void didUpdateWidget(PopupMenu oldWidget) {
-    if (widget.controller != null && widget.controller != _menuController) {
+  void didUpdateWidget(BubblePopupMenu oldWidget) {
+    if (oldWidget.controller != widget.controller) {
       _menuController?.removeListener(_listener);
-      _menuController = widget.controller;
+      _menuController = widget.controller ?? BubblePopupMenuController();
       _menuController?.addListener(_listener);
     }
     super.didUpdateWidget(oldWidget);
@@ -317,12 +342,12 @@ class _PopupMenuState extends State<PopupMenu> {
     return GestureDetector(
       key: _currentChildKey,
       behavior: HitTestBehavior.translucent,
-      onLongPress: widget.triggerType == PopupMenuTriggerType.onLongPress
+      onLongPress: widget.triggerType == BubblePopupMenuTriggerType.onLongPress
           ? () {
               _menuController?.show();
             }
           : null,
-      onTap: widget.triggerType == PopupMenuTriggerType.onTap
+      onTap: widget.triggerType == BubblePopupMenuTriggerType.onTap
           ? () {
               _menuController?.show();
             }
@@ -350,14 +375,12 @@ class _PopupMenuState extends State<PopupMenu> {
       return;
     }
 
-    ///show call back
-    if (widget.onPopupShow != null) {
-      widget.onPopupShow!();
-    }
-
     ///get child size and location
-    RenderBox renderBox =
-        _currentChildKey.currentContext?.findRenderObject() as RenderBox;
+    final Object? renderObject = _currentChildKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) {
+      return;
+    }
+    final RenderBox renderBox = renderObject;
     final Offset offset = renderBox.localToGlobal(Offset.zero);
     _currentChildRect = Rect.fromLTWH(
       offset.dx,
@@ -384,6 +407,9 @@ class _PopupMenuState extends State<PopupMenu> {
       ),
     );
     overlay.insert(_currentShowOverlay!);
+    if (widget.onPopupShow != null) {
+      widget.onPopupShow!();
+    }
     _animationController.show();
     _animationHoverController.show();
 
@@ -452,9 +478,7 @@ class _PopupMenuState extends State<PopupMenu> {
     _cacheMenus ??= widget.menusBuilder(context, _menuController!);
 
     ///sub head option
-    _cacheSubHead ??= (widget.subHeadBuilder != null)
-        ? widget.subHeadBuilder!(context, _menuController!)
-        : null;
+    _cacheSubHead ??= (widget.subHeadBuilder != null) ? widget.subHeadBuilder!(context, _menuController!) : null;
 
     ///offset
     final Rect rect = _currentChildRect;
@@ -465,18 +489,14 @@ class _PopupMenuState extends State<PopupMenu> {
 
     ///get the container rect
     Rect bigRect = Rect.fromLTWH(
-      widget.contentPadding.left,
-      widget.contentPadding.top,
-      MediaQuery.of(context).size.width -
-          widget.contentPadding.left -
-          widget.contentPadding.right,
-      MediaQuery.of(context).size.height -
-          widget.contentPadding.top -
-          widget.contentPadding.bottom,
+      widget.boundaryPadding.left,
+      widget.boundaryPadding.top,
+      MediaQuery.of(context).size.width - widget.boundaryPadding.left - widget.boundaryPadding.right,
+      MediaQuery.of(context).size.height - widget.boundaryPadding.top - widget.boundaryPadding.bottom,
     );
 
     ///limit the rect
-    Rect smallRect = Rect.fromLTWH(
+    Rect menuRect = Rect.fromLTWH(
       0,
       0,
       menuWidth,
@@ -484,47 +504,68 @@ class _PopupMenuState extends State<PopupMenu> {
     );
 
     ///check which space is larger
-    bool showDown =
-        (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
+    bool showDown = (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
 
     ///position
     Offset pos;
 
     ///get left and top
     if (showDown) {
+      double left;
+      switch (widget.align) {
+        case BubblePopupMenuAlign.center:
+          left = rect.left - menuWidth / 2 + rect.width / 2;
+          break;
+        case BubblePopupMenuAlign.start:
+          left = rect.left;
+          break;
+        case BubblePopupMenuAlign.end:
+          left = rect.right - menuWidth;
+          break;
+      }
       pos = Offset(
-        rect.left - menuWidth / 2 + rect.width / 2,
+        left,
         rect.top + rect.height + widget.offsetSpace,
       );
     } else {
-      ///get left and top
+      double left;
+      switch (widget.align) {
+        case BubblePopupMenuAlign.center:
+          left = rect.left - menuWidth / 2 + rect.width / 2;
+          break;
+        case BubblePopupMenuAlign.start:
+          left = rect.left;
+          break;
+        case BubblePopupMenuAlign.end:
+          left = rect.right - menuWidth;
+          break;
+      }
       pos = Offset(
-        rect.left - menuWidth / 2 + rect.width / 2,
+        left,
         rect.top - menuHeight - widget.offsetSpace,
       );
     }
 
     ///pos limit
-    Offset posLimit = constrainRectWithinRect(bigRect, smallRect, pos);
+    Offset posLimit = constrainRectWithinRect(bigRect, menuRect, pos);
+
+    double delta;
 
     ///delta offset
-    double delta = ((pos.dx + menuWidth / 2) - posLimit.dx);
-
-    double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
-    double showPosX = 0;
-
-    ///align
     switch (widget.align) {
-      case PopupMenuAlign.start:
-        showPosX = rect.left;
+      case BubblePopupMenuAlign.start:
+        delta = (rect.width / 2) + (pos.dx - posLimit.dx);
         break;
-      case PopupMenuAlign.end:
-        showPosX = rect.right - menuWidth;
+      case BubblePopupMenuAlign.end:
+        delta = (menuWidth - rect.width / 2) + (pos.dx - posLimit.dx);
         break;
-      case PopupMenuAlign.center:
-        showPosX = posLimit.dx - (widget.offsetDx ?? 0);
+      case BubblePopupMenuAlign.center:
+        delta = (menuWidth / 2) + (pos.dx - posLimit.dx);
         break;
     }
+
+    double showPosY = posLimit.dy - (widget.offsetDy ?? 0);
+    double showPosX = posLimit.dx + (widget.offsetDx ?? 0);
 
     return Material(
       color: Colors.transparent,
@@ -553,8 +594,12 @@ class _PopupMenuState extends State<PopupMenu> {
 
   ///hover
   Widget _buildOverlayHover() {
-    return PopupAnimation(
+    if (widget.hover == null) {
+      return const SizedBox.shrink();
+    }
+    return BubblePopupAnimation(
       controller: _animationHoverController,
+      duration: widget.bubbleAnimDuration,
       child: widget.hover ?? const SizedBox(),
     );
   }
@@ -573,13 +618,8 @@ class _PopupMenuState extends State<PopupMenu> {
 
       ///check to show child
       double top = showDown
-          ? min(_currentChildRect.top,
-              menuOffset.dy - _currentChildRect.height - widget.offsetSpace)
-          : max(
-              _currentChildRect.top,
-              menuOffset.dy +
-                  (_currentPopupRect?.height ?? 0) +
-                  widget.offsetSpace);
+          ? min(_currentChildRect.top, menuOffset.dy - _currentChildRect.height - widget.offsetSpace)
+          : max(_currentChildRect.top, menuOffset.dy + (_currentPopupRect?.height ?? 0) + widget.offsetSpace);
 
       return Positioned(
         left: _currentChildRect.left,
@@ -608,15 +648,44 @@ class _PopupMenuState extends State<PopupMenu> {
     List<Widget> menus,
     Widget? header,
   ) {
+    Alignment align;
+    switch (widget.align) {
+      case BubblePopupMenuAlign.start:
+        if (showDown) {
+          align = Alignment.topLeft;
+        } else {
+          align = Alignment.bottomLeft;
+        }
+        break;
+      case BubblePopupMenuAlign.end:
+        if (showDown) {
+          align = Alignment.topRight;
+        } else {
+          align = Alignment.bottomRight;
+        }
+        break;
+      case BubblePopupMenuAlign.center:
+        if (showDown) {
+          align = Alignment.topCenter;
+        } else {
+          align = Alignment.bottomCenter;
+        }
+        break;
+    }
     return Positioned(
       left: offset.dx,
       top: offset.dy,
-      child: PopupAnimation(
+      child: BubblePopupAnimation(
         controller: _animationController,
+        enableScale: widget.bubbleAnimScaleEnable,
+        curve: widget.bubbleAnimCurve,
+        reverseCurve: widget.bubbleAnimCurve,
+        duration: widget.bubbleAnimDuration,
+        scaleAlignment: align,
         onHide: () {
           _currentShowOverlay?.remove();
           _currentShowOverlay = null;
-          widget.controller?._isShowPop = false;
+          _menuController?._isShowPop = false;
           _currentIsPop = false;
           _currentPopupRect = null;
           _cacheMenus = null;
@@ -657,48 +726,65 @@ class _PopupMenuState extends State<PopupMenu> {
   ) {
     ///bubble
     Widget content;
-    if (widget.bubbleDecoration != null) {
+    final PopupBubbleOptions bubbleOptions = widget.background.bubbleOptions ?? const PopupBubbleOptions();
+    if (widget.background.decoration != null) {
       content = Container(
-        decoration: widget.bubbleDecoration,
-        child: Column(
-          verticalDirection: VerticalDirection.down,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: createListWithSeparators(menus),
+        decoration: widget.background.decoration,
+        child: Padding(
+          padding: widget.bubblePadding,
+          child: Column(
+            verticalDirection: VerticalDirection.down,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: createListWithSeparators(menus),
+          ),
         ),
       );
     } else {
       content = BubbleContainer(
         type: showDown ? BubbleType.top : BubbleType.bottom,
         deltaOffset: delta,
-        radius: widget.bubbleOptions.bubbleRadius,
-        color: widget.bubbleOptions.bubbleColor,
-        shadowColor: widget.bubbleOptions.bubbleShadowColor,
-        shadowElevation: widget.bubbleOptions.bubbleShadowElevation,
-        shadowOccluder: widget.bubbleOptions.bubbleShadowOccluder,
-        child: Column(
-          verticalDirection: VerticalDirection.down,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: createListWithSeparators(menus),
+        radius: bubbleOptions.bubbleRadius,
+        color: bubbleOptions.bubbleColor,
+        shadowColor: bubbleOptions.bubbleShadowColor,
+        shadowElevation: bubbleOptions.bubbleShadowElevation,
+        child: Padding(
+          padding: widget.bubblePadding,
+          child: Column(
+            verticalDirection: VerticalDirection.down,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: createListWithSeparators(menus),
+          ),
         ),
       );
     }
 
-    ///sub head is null
+    /// sub head is null
     if (subHead == null) {
       return content;
     }
 
+    /// 布局处理
+    CrossAxisAlignment alignment;
+    switch (widget.subHeadAlign) {
+      case BubblePopupMenuSubHeadAlign.start:
+        alignment = CrossAxisAlignment.start;
+        break;
+      case BubblePopupMenuSubHeadAlign.end:
+        alignment = CrossAxisAlignment.end;
+        break;
+      case BubblePopupMenuSubHeadAlign.center:
+        alignment = CrossAxisAlignment.center;
+        break;
+    }
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      verticalDirection:
-          showDown ? VerticalDirection.down : VerticalDirection.up,
-      crossAxisAlignment: widget.subHeadAlign == PopupMenuSubHeadAlign.start
-          ? CrossAxisAlignment.start
-          : CrossAxisAlignment.end,
+      verticalDirection: showDown ? VerticalDirection.down : VerticalDirection.up,
+      crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,
       children: [
         subHead,
@@ -708,11 +794,9 @@ class _PopupMenuState extends State<PopupMenu> {
   }
 
   /// Build constrain rect
-  Offset constrainRectWithinRect(
-      Rect bigRect, Rect smallRect, Offset smallRectOffset) {
+  Offset constrainRectWithinRect(Rect bigRect, Rect smallRect, Offset smallRectOffset) {
     // 计算小 Rect 右下角的 Offset
-    Offset smallRectBottomRight =
-        smallRectOffset + Offset(smallRect.width, smallRect.height);
+    Offset smallRectBottomRight = smallRectOffset + Offset(smallRect.width, smallRect.height);
 
     // 计算小 Rect 能够移动的最大 Offset
     double maxDx = bigRect.right - smallRect.width;

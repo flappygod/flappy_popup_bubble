@@ -42,7 +42,6 @@ class BubbleContainer extends StatelessWidget {
 
   final Color? shadowColor;
   final double shadowElevation;
-  final bool shadowOccluder;
 
   const BubbleContainer({
     super.key,
@@ -54,7 +53,7 @@ class BubbleContainer extends StatelessWidget {
     this.type = BubbleType.bottom,
     this.deltaOffset = 20,
     this.deltaLength = 10,
-    this.deltaHeight = 6,
+    this.deltaHeight = 5,
     this.deltaCorner = 2,
     this.width,
     this.height,
@@ -62,7 +61,6 @@ class BubbleContainer extends StatelessWidget {
     this.constraints,
     this.shadowColor,
     this.shadowElevation = 5,
-    this.shadowOccluder = false,
   });
 
   @override
@@ -80,7 +78,6 @@ class BubbleContainer extends StatelessWidget {
           deltaHeight: deltaHeight,
           shadowColor: shadowColor,
           shadowElevation: shadowElevation,
-          shadowOccluder: shadowOccluder,
         ),
         child: Container(
           padding: padding,

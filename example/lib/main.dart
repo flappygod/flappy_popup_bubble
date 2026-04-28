@@ -37,7 +37,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final PopupMenuController _controller = PopupMenuController();
+  final BubblePopupMenuController _controller = BubblePopupMenuController();
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +65,7 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             _buildPopMenu(
               Container(
-                decoration: BoxDecoration(
-                    color: Colors.blue, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(8)),
                 width: 140,
                 height: 50,
                 alignment: Alignment.center,
@@ -84,9 +83,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   _controller.hide();
                 },
                 child: Container(
-                  decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
                   width: 140,
                   height: 50,
                 ),
@@ -100,17 +97,19 @@ class _MyHomePageState extends State<MyHomePage> {
 
   ///build pop menu
   Widget _buildPopMenu(Widget child) {
-    return PopupMenu(
+    return BubblePopupMenu(
       controller: _controller,
       translucent: true,
-      barrierDismissible: true,
-      bubbleOptions: const PopupBubbleOptions(
-        bubbleShadowColor: Colors.black,
-        bubbleShadowElevation: 5.0,
+      barrierDismissible: false,
+      background: const PopupMenuBackground.bubble(
+        options: PopupBubbleOptions(
+          bubbleShadowColor: Colors.black,
+          bubbleShadowElevation: 5.0,
+        ),
       ),
       menusBuilder: (context, controller) {
         return [
-          PopupMenuBtn(
+          BubblePopupMenuAction(
             text: "Function One",
             icon: const Icon(
               Icons.scale,
@@ -121,7 +120,7 @@ class _MyHomePageState extends State<MyHomePage> {
               controller.hide();
             },
           ),
-          PopupMenuBtn(
+          BubblePopupMenuAction(
             text: "Function Two",
             icon: const Icon(
               Icons.add,

@@ -343,21 +343,31 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    Widget content = KeyedSubtree(
       key: _currentChildKey,
-      behavior: HitTestBehavior.translucent,
-      onLongPress: widget.triggerType == BubblePopupMenuTriggerType.onLongPress
-          ? () {
-              _menuController?.show();
-            }
-          : null,
-      onTap: widget.triggerType == BubblePopupMenuTriggerType.onTap
-          ? () {
-              _menuController?.show();
-            }
-          : null,
       child: _buildChild(),
     );
+    switch (widget.triggerType) {
+      //没有点击事件
+      case BubblePopupMenuTriggerType.none:
+        return content;
+      //长按
+      case BubblePopupMenuTriggerType.onLongPress:
+        return GestureDetector(
+          onLongPress: () {
+            _menuController?.show();
+          },
+          child: content,
+        );
+      //点击
+      case BubblePopupMenuTriggerType.onTap:
+        return GestureDetector(
+          onTap: () {
+            _menuController?.show();
+          },
+          child: content,
+        );
+    }
   }
 
   ///build child

@@ -72,7 +72,8 @@ class BubblePopupMenuAction extends StatelessWidget {
                 text ?? '',
                 maxLines: maxLines,
                 overflow: TextOverflow.ellipsis,
-                style: textStyle ?? const TextStyle(color: Colors.black, fontSize: 13),
+                style: textStyle ??
+                    const TextStyle(color: Colors.black, fontSize: 13),
               ),
             ),
             icon ?? const SizedBox(),

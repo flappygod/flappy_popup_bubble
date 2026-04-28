@@ -65,7 +65,8 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             _buildPopMenu(
               Container(
-                decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                    color: Colors.blue, borderRadius: BorderRadius.circular(8)),
                 width: 140,
                 height: 50,
                 alignment: Alignment.center,
@@ -83,7 +84,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   _controller.hide();
                 },
                 child: Container(
-                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(8)),
                   width: 140,
                   height: 50,
                 ),

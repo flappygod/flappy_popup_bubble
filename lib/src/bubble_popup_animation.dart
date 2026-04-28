@@ -77,7 +77,8 @@ class BubblePopupAnimation extends StatefulWidget {
 }
 
 /// Pop feed animation alpha state
-class _BubblePopupAnimationState extends State<BubblePopupAnimation> with SingleTickerProviderStateMixin {
+class _BubblePopupAnimationState extends State<BubblePopupAnimation>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -147,7 +148,8 @@ class _BubblePopupAnimationState extends State<BubblePopupAnimation> with Single
 
       if (widget.controller.animation && !_animationController.isCompleted) {
         _animationController.forward();
-      } else if (!widget.controller.animation && !_animationController.isDismissed) {
+      } else if (!widget.controller.animation &&
+          !_animationController.isDismissed) {
         _animationController.reverse();
       }
     }

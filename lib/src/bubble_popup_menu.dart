@@ -234,10 +234,12 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
   late ValueChanged<int> _listener;
 
   ///controller
-  final BubblePopupAnimationController _animationController = BubblePopupAnimationController();
+  final BubblePopupAnimationController _animationController =
+      BubblePopupAnimationController();
 
   ///controller
-  final BubblePopupAnimationController _animationHoverController = BubblePopupAnimationController();
+  final BubblePopupAnimationController _animationHoverController =
+      BubblePopupAnimationController();
 
   ///global key
   final GlobalKey _currentChildKey = GlobalKey();
@@ -288,8 +290,10 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
   void _measurePopupMenuSize() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ///如果rect已经存在了，已经拿到了
-      RenderBox? renderBox = _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
-      final Offset offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+      RenderBox? renderBox =
+          _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
+      final Offset offset =
+          renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
       Rect newRect = Rect.fromLTWH(
         offset.dx,
         offset.dy,
@@ -376,7 +380,8 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
     }
 
     ///get child size and location
-    final Object? renderObject = _currentChildKey.currentContext?.findRenderObject();
+    final Object? renderObject =
+        _currentChildKey.currentContext?.findRenderObject();
     if (renderObject is! RenderBox) {
       return;
     }
@@ -478,7 +483,9 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
     _cacheMenus ??= widget.menusBuilder(context, _menuController!);
 
     ///sub head option
-    _cacheSubHead ??= (widget.subHeadBuilder != null) ? widget.subHeadBuilder!(context, _menuController!) : null;
+    _cacheSubHead ??= (widget.subHeadBuilder != null)
+        ? widget.subHeadBuilder!(context, _menuController!)
+        : null;
 
     ///offset
     final Rect rect = _currentChildRect;
@@ -491,8 +498,12 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
     Rect bigRect = Rect.fromLTWH(
       widget.boundaryPadding.left,
       widget.boundaryPadding.top,
-      MediaQuery.of(context).size.width - widget.boundaryPadding.left - widget.boundaryPadding.right,
-      MediaQuery.of(context).size.height - widget.boundaryPadding.top - widget.boundaryPadding.bottom,
+      MediaQuery.of(context).size.width -
+          widget.boundaryPadding.left -
+          widget.boundaryPadding.right,
+      MediaQuery.of(context).size.height -
+          widget.boundaryPadding.top -
+          widget.boundaryPadding.bottom,
     );
 
     ///limit the rect
@@ -504,7 +515,8 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
     );
 
     ///check which space is larger
-    bool showDown = (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
+    bool showDown =
+        (bigRect.bottom - rect.top - rect.height) >= (rect.top - bigRect.top);
 
     ///position
     Offset pos;
@@ -618,8 +630,13 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
 
       ///check to show child
       double top = showDown
-          ? min(_currentChildRect.top, menuOffset.dy - _currentChildRect.height - widget.offsetSpace)
-          : max(_currentChildRect.top, menuOffset.dy + (_currentPopupRect?.height ?? 0) + widget.offsetSpace);
+          ? min(_currentChildRect.top,
+              menuOffset.dy - _currentChildRect.height - widget.offsetSpace)
+          : max(
+              _currentChildRect.top,
+              menuOffset.dy +
+                  (_currentPopupRect?.height ?? 0) +
+                  widget.offsetSpace);
 
       return Positioned(
         left: _currentChildRect.left,
@@ -726,7 +743,8 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
   ) {
     ///bubble
     Widget content;
-    final PopupBubbleOptions bubbleOptions = widget.background.bubbleOptions ?? const PopupBubbleOptions();
+    final PopupBubbleOptions bubbleOptions =
+        widget.background.bubbleOptions ?? const PopupBubbleOptions();
     if (widget.background.decoration != null) {
       content = Container(
         decoration: widget.background.decoration,
@@ -783,7 +801,8 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      verticalDirection: showDown ? VerticalDirection.down : VerticalDirection.up,
+      verticalDirection:
+          showDown ? VerticalDirection.down : VerticalDirection.up,
       crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -794,9 +813,11 @@ class _BubblePopupMenuState extends State<BubblePopupMenu> {
   }
 
   /// Build constrain rect
-  Offset constrainRectWithinRect(Rect bigRect, Rect smallRect, Offset smallRectOffset) {
+  Offset constrainRectWithinRect(
+      Rect bigRect, Rect smallRect, Offset smallRectOffset) {
     // 计算小 Rect 右下角的 Offset
-    Offset smallRectBottomRight = smallRectOffset + Offset(smallRect.width, smallRect.height);
+    Offset smallRectBottomRight =
+        smallRectOffset + Offset(smallRect.width, smallRect.height);
 
     // 计算小 Rect 能够移动的最大 Offset
     double maxDx = bigRect.right - smallRect.width;

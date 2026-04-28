@@ -326,7 +326,8 @@ class BubblePainter extends CustomPainter {
             clockwise: true,
           );
         }
-        if (deltaOffset + safeLength >= size.height - safeRadius.bottomRight.y) {
+        if (deltaOffset + safeLength >=
+            size.height - safeRadius.bottomRight.y) {
           path.lineTo(size.width - safeRadius.bottomRight.x, size.height);
           path.lineTo(size.width, size.height - safeRadius.bottomRight.y);
           path.arcToPoint(

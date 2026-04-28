@@ -1,3 +1,3 @@
-## 1.2.0
+## 1.2.1
 
-1. Rename popupMenu to BubblePopupMenu to distinguish it from the system.
+1. Change BubblePopupMenuTriggerType.none's behavior.

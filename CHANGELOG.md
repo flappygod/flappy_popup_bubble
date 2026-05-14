@@ -1,3 +1,3 @@
-## 1.2.1
+## 1.2.2
 
-1. Change BubblePopupMenuTriggerType.none's behavior.
+1. Optimize [bubble_painter.dart](lib/src/bubble_painter.dart).

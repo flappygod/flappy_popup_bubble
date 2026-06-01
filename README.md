@@ -1,16 +1,20 @@
 # flappy_popup_bubble
 
-`flappy_popup_bubble` is a lightweight Flutter package to display a bubble-style popup menu near a target widget. It supports long-press or tap triggers, smart positioning, animation, and customizable background styles.
+`flappy_popup_bubble` is a lightweight Flutter package to display a bubble-style popup menu near a target widget. It supports long-press or tap triggers, smart positioning, enter/exit animations, and customizable background styles.
 
 ## Features
 
 - Bubble popup with rounded corners and arrow indicator
+- Enter/exit animations (fade + optional scale, child translate)
 - Trigger by long press, tap, or fully manual controller mode
-- Overlay-based rendering with auto up/down placement
+- Overlay-based rendering with auto or forced up/down placement
+- Generic popup data via `BubblePopupMenu<T>` and `controller.show(data: ...)`
 - Built-in menu item widget and separator support
+- Optional header area (`headerBuilder`)
 - Optional hover overlay (e.g. blur mask)
 - Customizable menu background via bubble options or decoration
-- Boundary padding and offset controls for safer layout
+- Boundary padding for safer layout
+- Standalone `BubblePopupAnimation` widget for custom popups
 
 ## Installation
 
@@ -18,7 +22,7 @@ Add dependency in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flappy_popup_bubble: ^1.1.5
+  flappy_popup_bubble: ^2.0.0
 ```
 
 Then run:
@@ -49,7 +53,7 @@ class _DemoMenuState extends State<DemoMenu> {
       controller: _controller,
       triggerType: BubblePopupMenuTriggerType.onLongPress,
       align: BubblePopupMenuAlign.center,
-      offsetSpace: 10,
+      direction: BubblePopupMenuDirection.auto,
       boundaryPadding: const EdgeInsets.all(12),
       background: const PopupMenuBackground.bubble(
         options: PopupBubbleOptions(
@@ -58,7 +62,7 @@ class _DemoMenuState extends State<DemoMenu> {
           bubbleShadowElevation: 5,
         ),
       ),
-      menusBuilder: (context, controller) {
+      menusBuilder: (context, controller, data) {
         return [
           BubblePopupMenuAction(
             text: 'Copy',
@@ -91,17 +95,18 @@ class _DemoMenuState extends State<DemoMenu> {
 
 ### BubblePopupMenu
 
-Main popup widget.
+Main popup widget. Supports an optional generic type `T` for popup-associated data.
 
 Key parameters:
 
-- `controller`: external popup controller
+- `controller`: external popup controller (`BubblePopupMenuController<T>`)
 - `child`: anchor/target widget
-- `menusBuilder`: builds popup menu widgets
+- `menusBuilder`: builds popup menu widgets; signature `(context, controller, data)`
+- `headerBuilder`: optional header above the menu; same signature as `menusBuilder`
 - `triggerType`: `onLongPress` (default), `onTap`, `none`
 - `align`: popup horizontal alignment (`start`, `center`, `end`)
-- `offsetSpace`: spacing between target and popup
-- `offsetDx` / `offsetDy`: additional position offsets
+- `direction`: popup placement (`auto`, `up`, `down`)
+- `menuPadding` / `headerPadding`: padding around menu and header in overlay
 - `boundaryPadding`: keep popup away from overlay edges
 - `bubblePadding`: padding inside popup content area
 - `background`: bubble background or custom decoration
@@ -109,7 +114,9 @@ Key parameters:
 - `translucent`: whether taps can pass through overlay
 - `barrierDismissible`: close when tapping outside
 - `showChildTop`: draw child copy in overlay top layer
-- `bubbleAnimScaleEnable`, `bubbleAnimCurve`, `bubbleAnimDuration`: animation options
+- `bubbleAnimScaleEnable`, `bubbleAnimCurve`, `bubbleAnimDuration`: popup scale/fade animation
+- `childTranslateCurve`: curve for child translate animation while popup is open
+- `shouldHandlePopup`: filter which menu instance handles events when sharing one controller (e.g. in lists)
 - `onPopupShow`, `onPopupHide`: popup lifecycle callbacks
 
 Important:
@@ -120,10 +127,12 @@ Important:
 
 Controller methods:
 
-- `show()`: show popup
-- `hide()`: hide popup
-- `rebuild()`: rebuild menu and sub head
+- `show({T? data})`: show popup and optionally attach data
+- `hide({bool animated = true})`: hide popup; set `animated: false` to remove immediately
+- `rebuild()`: rebuild menu and header
+- `clearData()`: clear attached data
 - `isShow()`: check whether popup is showing
+- `data`: read current popup data
 
 ### BubblePopupMenuAction
 
@@ -140,11 +149,45 @@ Common parameters:
 - `borderRadius`
 - `enableSplash`
 
+### BubblePopupAnimation
+
+Reusable fade/scale animation wrapper, usable outside `BubblePopupMenu`.
+
+- `BubblePopupAnimationController`: call `show()` / `hide()` to drive animation
+- `enableScale`, `beginScale`, `scaleAlignment`, `curve`, `duration`
+
 ## Trigger Modes
 
 - `BubblePopupMenuTriggerType.onLongPress`: show popup on long press
 - `BubblePopupMenuTriggerType.onTap`: show popup on tap
 - `BubblePopupMenuTriggerType.none`: manual mode with controller
+
+## Popup Data (Generic)
+
+Pass context into the popup when opening:
+
+```dart
+final BubblePopupMenuController<Item> controller = BubblePopupMenuController();
+
+BubblePopupMenu<Item>(
+  controller: controller,
+  menusBuilder: (context, controller, data) {
+    final item = data;
+    // build menu based on item
+    return [...];
+  },
+  child: ...,
+);
+
+// later
+controller.show(data: selectedItem);
+```
+
+For list items sharing one controller, use `shouldHandlePopup`:
+
+```dart
+shouldHandlePopup: (data) => data?.id == widget.item.id,
+```
 
 ## Background Customization
 
@@ -171,6 +214,14 @@ background: PopupMenuBackground.decoration(
   ),
 ),
 ```
+
+## Migration from 1.x
+
+- Bump dependency to `^2.0.0`.
+- `menusBuilder` now has a third parameter `T? data`; update callbacks to `(context, controller, data)`.
+- `offsetSpace`, `offsetDx`, and `offsetDy` were removed; use `menuPadding`, `boundaryPadding`, and layout around `child` instead.
+- `controller.hide()` plays exit animation by default; use `hide(animated: false)` for instant dismiss.
+- Popup show/hide uses built-in `BubblePopupAnimation`; tune via `bubbleAnim*` and `childTranslateCurve`.
 
 ## Notes
 

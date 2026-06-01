@@ -39,7 +39,7 @@ class BubblePopupMenuAction extends StatelessWidget {
     this.maxLines,
     this.icon,
     this.onTap,
-    this.width = 160,
+    this.width = 180,
     this.height = 50,
     this.padding = const EdgeInsets.fromLTRB(12.5, 0, 12.5, 0),
     this.borderRadius,

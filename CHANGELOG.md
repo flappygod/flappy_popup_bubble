@@ -1,3 +1,3 @@
-## 1.2.2
+## 2.0.0
 
-1. Optimize [bubble_painter.dart](lib/src/bubble_painter.dart).
+1. 修改bubble_popup_menu.dart整体实现逻辑，增加展示动画。

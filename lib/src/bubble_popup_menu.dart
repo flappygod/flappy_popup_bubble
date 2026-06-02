@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'bubble_popup_animation.dart';
+import 'bubble_popup_archor.dart';
+import 'bubble_dialog_frame.dart';
 import 'bubble_container.dart';
 import 'bubble_painter.dart';
 import 'dart:math';
+
+///弹窗漂浮的类型
+enum BubblePopupMenuType {
+  //layer
+  layer,
+  //dialog
+  dialog,
+}
 
 /// trigger type
 /// 触发类型
@@ -87,11 +97,11 @@ class BubblePopupMenuController<T> {
 
   /// is show pop
   /// 当前是否显示弹窗
-  bool _isShowPop = false;
+  bool _currentIsShow = false;
 
   /// popup data
   /// 当前弹窗携带的数据
-  T? _data;
+  T? _currentData;
 
   /// hide with animation
   /// 隐藏时是否播放退出动画
@@ -99,19 +109,19 @@ class BubblePopupMenuController<T> {
 
   /// current popup data
   /// 当前弹窗数据
-  T? get data => _data;
+  T? get data => _currentData;
 
   /// whether popup is showing
   /// 是否正在显示弹窗
   bool isShow() {
-    return _isShowPop;
+    return _currentIsShow;
   }
 
   /// show menu
   /// 显示菜单，可选传入数据
   void show({T? data}) {
-    _data = data;
-    _isShowPop = true;
+    _currentData = data;
+    _currentIsShow = true;
     notifyListeners(_eventShow);
   }
 
@@ -119,7 +129,7 @@ class BubblePopupMenuController<T> {
   /// 隐藏菜单，可指定是否播放退出动画
   void hide({bool animated = true}) {
     _hideAnimated = animated;
-    _isShowPop = false;
+    _currentIsShow = false;
     notifyListeners(_eventHide);
   }
 
@@ -131,8 +141,8 @@ class BubblePopupMenuController<T> {
 
   /// clear data
   /// 清空当前数据
-  void clearData() {
-    _data = null;
+  void _clearData() {
+    _currentData = null;
   }
 
   /// notify listener
@@ -162,6 +172,9 @@ class BubblePopupMenu<T> extends StatefulWidget {
   /// controller
   /// 控制器
   final BubblePopupMenuController<T>? controller;
+
+  /// 类型
+  final BubblePopupMenuType type;
 
   /// header builder
   /// 头部构建器
@@ -259,6 +272,7 @@ class BubblePopupMenu<T> extends StatefulWidget {
     super.key,
     this.controller,
     this.headerBuilder,
+    this.type = BubblePopupMenuType.layer,
     required this.child,
     required this.menusBuilder,
     this.dividerColor = Colors.black87,
@@ -294,7 +308,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     with SingleTickerProviderStateMixin {
   /// menu controller
   /// 菜单控制器
-  BubblePopupMenuController<T>? _menuController;
+  late BubblePopupMenuController<T> _menuController;
 
   /// listener
   /// 事件监听器
@@ -321,11 +335,12 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   Offset _translationBeginOffset = Offset.zero;
   bool _translationHiding = false;
 
-  /// global key
-  /// child 的全局 key
+  /// 列表侧 anchor slot，用于读取 child 全局 rect（无需 GlobalKey）
+  final BubblePopupAnchorScope _anchorScope = BubblePopupAnchorScope();
+
+  /// child 的全局 key（showChildTop 时 reparent 用）
   final GlobalKey _currentChildKey = GlobalKey();
   Rect _currentChildRect = Rect.zero;
-  bool _currentIsPop = false;
 
   /// menu key
   /// menu 的全局 key
@@ -344,6 +359,17 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// overlay is show or not
   /// 当前 overlay
   OverlayEntry? _currentShowOverlay;
+
+  /// 当前是否展示了dialog
+  bool _isDialogShow = false;
+  bool _isLayerShow = false;
+
+  /// 当前展示的dialog
+  final BubbleDialogFrameController _currentFrameController =
+      BubbleDialogFrameController();
+
+  /// 当前展示的dialogRoute
+  BuildContext? _currentShowDialogContext;
 
   @override
   void initState() {
@@ -367,26 +393,55 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     ///设置监听
     _listener = (event) {
+      ///隐藏弹出层
       if (event == BubblePopupMenuController._eventHide) {
-        if (_currentIsPop || _currentShowOverlay != null) {
-          _hideOverlay(animated: _menuController?._hideAnimated ?? true);
+        ///如果当前是弹出状态，执行隐藏操作
+        if (_isLayerShow || _isDialogShow) {
+          _hidePopUp(animated: _menuController._hideAnimated);
         }
       }
+
+      ///展示弹出层
       if (event == BubblePopupMenuController._eventShow) {
+        ///是否需要处理popUp
         final bool shouldHandle =
-            widget.shouldHandlePopup?.call(_menuController?.data) ?? true;
-        if (shouldHandle) {
-          _showOverlay();
+            widget.shouldHandlePopup?.call(_menuController.data) ?? true;
+        if (!shouldHandle) {
+          return;
+        }
+
+        ///可以展示，根据类型判断展示什么
+        switch (widget.type) {
+          case BubblePopupMenuType.dialog:
+            _showDialog();
+            break;
+          case BubblePopupMenuType.layer:
+            _showOverlay();
+            break;
         }
       }
+
+      ///执行界面刷新
       if (event == BubblePopupMenuController._eventRebuild) {
+        ///清空menu缓存
         _cacheMenus = null;
-        _measurePopupSize();
-        _currentShowOverlay?.markNeedsBuild();
+
+        ///如果已经显示了，更新位置
+        if (_isLayerShow || _isDialogShow) {
+          _updateCurrentRect();
+        }
+
+        ///刷新界面
+        _currentFrameController.refresh();
+
+        ///添加post frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkPopupRelayout();
+        });
       }
     };
     _menuController = widget.controller ?? BubblePopupMenuController<T>();
-    _menuController?.addListener(_listener);
+    _menuController.addListener(_listener);
 
     _checkNeedShowOrNot();
   }
@@ -395,37 +450,39 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   void didUpdateWidget(BubblePopupMenu<T> oldWidget) {
     ///更新控制器
     if (oldWidget.controller != widget.controller) {
-      _menuController?.removeListener(_listener);
+      _menuController.removeListener(_listener);
       _menuController = widget.controller ?? BubblePopupMenuController<T>();
-      _menuController?.addListener(_listener);
+      _menuController.addListener(_listener);
     }
 
     ///更新动画
     if (oldWidget.bubbleAnimDuration != widget.bubbleAnimDuration) {
       _translationController.duration = widget.bubbleAnimDuration;
     }
+
+    ///展示方式变化时先关闭当前弹层，避免 dialog / layer 状态并存
+    if (oldWidget.type != widget.type && (_isLayerShow || _isDialogShow)) {
+      _hidePopUp(animated: false);
+    }
+
     super.didUpdateWidget(oldWidget);
   }
 
   @override
   void dispose() {
+    _menuController.removeListener(_listener);
+    _cleanupPopupShell();
     _translationController.dispose();
     _scrollController.dispose();
-    _menuController?.removeListener(_listener);
-
-    /// remove overlay
-    /// 移除 overlay
-    _currentShowOverlay?.remove();
-    _currentShowOverlay = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     ///child
-    final Widget content = KeyedSubtree(
-      key: _currentChildKey,
-      child: _buildChild(),
+    final Widget content = BubblePopupAnchor(
+      scope: _anchorScope,
+      child: _buildBaseChild(),
     );
 
     ///根据动作类型考虑是否增加
@@ -438,7 +495,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onLongPress: () {
-            _menuController?.show();
+            _menuController.show();
           },
           child: content,
         );
@@ -447,7 +504,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
-            _menuController?.show();
+            _menuController.show();
           },
           child: content,
         );
@@ -456,15 +513,22 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
   /// build child
   /// 构建 child
-  Widget _buildChild() {
-    ///显示在顶部且正在展示的时候，原本的view不展示
-    if (widget.showChildTop && _currentIsPop) {
+  Widget _buildBaseChild() {
+    if (widget.showChildTop && (_isLayerShow || _isDialogShow)) {
       return SizedBox(
         width: _currentChildRect.width,
         height: _currentChildRect.height,
       );
     }
-    return widget.child;
+    return _buildChild();
+  }
+
+  /// 构建child
+  Widget _buildChild() {
+    return KeyedSubtree(
+      key: _currentChildKey,
+      child: widget.child,
+    );
   }
 
   /// check and show popup menu
@@ -476,33 +540,37 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       }
 
       ///展示之前的数据
-      if (_menuController?._isShowPop ?? false) {
-        _menuController?.show(data: _menuController?._data);
+      if (_menuController._currentIsShow) {
+        _menuController.show(data: _menuController._currentData);
       }
     });
   }
 
   /// update current child rect
   /// 更新当前 child 的位置和尺寸
-  bool _updateCurrentChildRect() {
-    final Object? renderObject =
-        _currentChildKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderBox) {
+  bool _updateCurrentRect() {
+    final Rect? rect = _anchorScope.globalRect();
+    if (rect == null) {
       return false;
     }
-    final Offset offset = renderObject.localToGlobal(Offset.zero);
-    _currentChildRect = Rect.fromLTWH(
-      offset.dx,
-      offset.dy,
-      renderObject.size.width,
-      renderObject.size.height,
-    );
+    _currentChildRect = rect;
     return true;
   }
 
   /// recalculate translation begin offset for hide
   /// 在隐藏前根据最新 child 位置重新计算回退偏移
-  void _refreshTranslationBeginOffsetForHide() {
+  void _refreshTranslationForHide() {
+    ///在被弹出新界面覆盖的情况下，不做回位动画，因为pushRoute后这个位置可能很奇怪。
+    if (widget.type == BubblePopupMenuType.layer) {
+      final bool isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+      if (!isCurrent) {
+        return;
+      }
+    }
+
+    ///更新当前的最新rect
+    _updateCurrentRect();
+
     final Rect rect = _currentChildRect;
     final Rect bigRect = Rect.fromLTWH(
       widget.boundaryPadding.left,
@@ -563,54 +631,52 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   }
 
   /// measure popup size
-  /// 测量弹窗尺寸
-  void _measurePopupSize() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      /// 已经清空
-      if (!mounted || _currentShowOverlay == null) {
-        return;
-      }
-      bool needRebuild = false;
+  /// 测量弹窗尺寸，并判断是否需要重新更新布局
+  void _checkPopupRelayout() {
+    /// 已经清空
+    if (!mounted) {
+      return;
+    }
+    bool needRebuild = false;
 
-      /// measure menu
-      /// 测量 menu
-      final RenderBox? menuRenderBox =
-          _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
-      final Offset menuOffset =
-          menuRenderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-      final Rect newMenuRect = Rect.fromLTWH(
-        menuOffset.dx,
-        menuOffset.dy,
-        menuRenderBox?.size.width ?? 0,
-        menuRenderBox?.size.height ?? 0,
-      );
-      if (_currentPopupRect == null || newMenuRect != _currentPopupRect) {
-        _currentPopupRect = newMenuRect;
-        needRebuild = true;
-      }
+    /// measure menu
+    /// 测量 menu
+    final RenderBox? menuRenderBox =
+        _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
+    final Offset menuOffset =
+        menuRenderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final Rect newMenuRect = Rect.fromLTWH(
+      menuOffset.dx,
+      menuOffset.dy,
+      menuRenderBox?.size.width ?? 0,
+      menuRenderBox?.size.height ?? 0,
+    );
+    if (_currentPopupRect == null || newMenuRect != _currentPopupRect) {
+      _currentPopupRect = newMenuRect;
+      needRebuild = true;
+    }
 
-      /// measure header
-      /// 测量 header
-      final RenderBox? headerRenderBox =
-          _popupHeaderKey.currentContext?.findRenderObject() as RenderBox?;
-      final Offset headerOffset =
-          headerRenderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-      final Rect newHeaderRect = Rect.fromLTWH(
-        headerOffset.dx,
-        headerOffset.dy,
-        headerRenderBox?.size.width ?? 0,
-        headerRenderBox?.size.height ?? 0,
-      );
-      if (_currentHeaderRect == null || newHeaderRect != _currentHeaderRect) {
-        _currentHeaderRect = newHeaderRect;
-        needRebuild = true;
-      }
+    /// measure header
+    /// 测量 header
+    final RenderBox? headerRenderBox =
+        _popupHeaderKey.currentContext?.findRenderObject() as RenderBox?;
+    final Offset headerOffset =
+        headerRenderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final Rect newHeaderRect = Rect.fromLTWH(
+      headerOffset.dx,
+      headerOffset.dy,
+      headerRenderBox?.size.width ?? 0,
+      headerRenderBox?.size.height ?? 0,
+    );
+    if (_currentHeaderRect == null || newHeaderRect != _currentHeaderRect) {
+      _currentHeaderRect = newHeaderRect;
+      needRebuild = true;
+    }
 
-      /// 需要更新
-      if (needRebuild) {
-        _currentShowOverlay?.markNeedsBuild();
-      }
-    });
+    /// 需要更新,执行界面刷新
+    if (needRebuild) {
+      _currentFrameController.refresh();
+    }
   }
 
   /// show overlay
@@ -618,13 +684,13 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   void _showOverlay() {
     /// is already show
     /// 已经显示则直接返回
-    if (_currentShowOverlay != null) {
+    if (_isLayerShow) {
       return;
     }
 
     /// get child size and location
     /// 获取 child 的尺寸和位置
-    if (!_updateCurrentChildRect()) {
+    if (!_updateCurrentRect()) {
       return;
     }
 
@@ -643,9 +709,8 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     );
     _translationController.reset();
 
-    /// current is pop
-    /// 当前处于弹窗状态
-    _currentIsPop = true;
+    ///设置layerShow
+    _isLayerShow = true;
     if (mounted) {
       setState(() {});
     }
@@ -654,27 +719,133 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     /// 插入 overlay
     final OverlayState overlay = Overlay.of(context, rootOverlay: true);
     _currentShowOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        left: 0,
-        top: 0,
-        width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).size.height,
-        child: _buildPopUpMenu(),
-      ),
+      builder: (context) {
+        return Positioned(
+          left: 0,
+          top: 0,
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          child: BubbleDialogFrame(
+            controller: _currentFrameController,
+            onFirstFrame: () {
+              ///展示动画并计算高度
+              _animationController.show();
+              _animationHoverController.show();
+              _checkPopupRelayout();
+
+              ///展示了
+              widget.onPopupShow?.call();
+            },
+            builder: (context) {
+              ///构建child
+              return _buildPopUpMenu();
+            },
+          ),
+        );
+      },
     );
     overlay.insert(_currentShowOverlay!);
-    widget.onPopupShow?.call();
-    _animationController.show();
-    _animationHoverController.show();
-
-    /// measure size
-    /// 计算高度
-    _measurePopupSize();
   }
 
-  /// hide overlay
-  /// 隐藏 overlay
-  Future _hideOverlay({bool animated = true}) async {
+  ///直接展示dialog
+  void _showDialog() {
+    /// is already show
+    /// 已经显示则直接返回
+    if (_isDialogShow) {
+      return;
+    }
+
+    /// get child size and location
+    /// 获取 child 的尺寸和位置
+    if (!_updateCurrentRect()) {
+      return;
+    }
+
+    /// reset translation
+    /// 重置平移动画
+    _translationBeginOffset = Offset.zero;
+    _translationAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _translationController,
+        curve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateCurve,
+      ),
+    );
+    _translationController.reset();
+
+    ///设置layerShow
+    _isDialogShow = true;
+    if (mounted) {
+      setState(() {});
+    }
+
+    ///系统返回与点击遮罩均走 [_hidePopUp]动画；barrier 不直接 pop 路由
+    showGeneralDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.transparent,
+      transitionDuration: Duration.zero,
+      pageBuilder: (BuildContext dialogContext, Animation<double> animation,
+          Animation<double> secondaryAnimation) {
+        ///获取当前的route
+        _currentShowDialogContext = dialogContext;
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) {
+            if (didPop || !_isDialogShow) {
+              return;
+            }
+            _hidePopUp(animated: _menuController._hideAnimated);
+          },
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox.expand(
+              child: BubbleDialogFrame(
+                controller: _currentFrameController,
+                onFirstFrame: () {
+                  _animationController.show();
+                  _animationHoverController.show();
+                  _checkPopupRelayout();
+                  widget.onPopupShow?.call();
+                },
+                builder: (BuildContext context) {
+                  return _buildPopUpMenu();
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      if (!mounted) {
+        return;
+      }
+      _onHideSuccess();
+    });
+  }
+
+  /// 关闭 dialog 路由，如果拿到了当前route,直接移除，没有拿到就pop
+  void _popDialogRouteIfNeeded() {
+    if (_currentShowDialogContext != null) {
+      ModalRoute? route = ModalRoute.of(_currentShowDialogContext!);
+      if (route != null) {
+        Navigator.of(_currentShowDialogContext!, rootNavigator: true)
+            .removeRoute(route);
+      } else {
+        Navigator.of(_currentShowDialogContext!, rootNavigator: true).pop();
+      }
+      _currentShowDialogContext = null;
+    }
+  }
+
+  /// hide popUp
+  /// 隐藏 popUp
+  Future _hidePopUp({bool animated = true}) async {
     ///正在hiding
     if (_translationHiding) {
       return;
@@ -686,16 +857,20 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       return;
     }
 
+    /// 判断当前是否mounted
+    if (!mounted) {
+      return;
+    }
+
     /// 在回退动画开始前，重新获取外部 child 的当前位置
     /// 并同步修正回退偏移
-    _updateCurrentChildRect();
-    _refreshTranslationBeginOffsetForHide();
+    _refreshTranslationForHide();
 
     ///当前正在hiding
     _translationHiding = true;
 
     ///刷新一次
-    _currentShowOverlay?.markNeedsBuild();
+    _currentFrameController.refresh();
     List<Future> futureList = [];
 
     ///回退动画
@@ -703,7 +878,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     futureList.add(_animationHoverController.hide());
 
     ///回退transition动画
-    if (_translationBeginOffset != Offset.zero) {
+    if (mounted && _translationBeginOffset != Offset.zero) {
       _translationAnimation = Tween<Offset>(
         begin: _translationAnimation.value,
         end: _translationBeginOffset,
@@ -727,24 +902,58 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         curve: widget.childTranslateCurve,
       ));
     }
-    await Future.wait(futureList);
+
+    ///执行回退
+    await Future.wait(futureList).timeout(
+      widget.bubbleAnimDuration,
+      onTimeout: () {
+        debugPrint('Future.wait timeout: ${widget.bubbleAnimDuration}');
+        return [];
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
 
     ///隐藏成功，执行success
     _onHideSuccess();
   }
 
-  ///隐藏成功
-  void _onHideSuccess() {
-    _currentShowOverlay?.remove();
-    _currentShowOverlay = null;
-    _menuController?._isShowPop = false;
-    _menuController?.clearData();
-    _currentIsPop = false;
+  /// 移除 overlay / dialog 并复位业务状态（不操作 [AnimationController]）
+  void _cleanupPopupShell() {
+    ///如果展示了layer，这里需要清理dialog
+    if (_isLayerShow) {
+      _currentShowOverlay?.remove();
+      _currentShowOverlay = null;
+      _isLayerShow = false;
+    }
+
+    ///如果展示了dialog，这里需要清理dialog
+    if (_isDialogShow) {
+      _isDialogShow = false;
+      _popDialogRouteIfNeeded();
+    }
+
+    ///清空为isShow false
+    _menuController._currentIsShow = false;
+
+    ///清理数据
+    _menuController._clearData();
     _translationHiding = false;
     _currentPopupRect = null;
     _currentHeaderRect = null;
     _cacheMenus = null;
+
+    ///动画归位
     _translationBeginOffset = Offset.zero;
+  }
+
+  /// 平移动画归位（须在 [AnimationController.dispose] 之前且 [mounted] 为 true 时调用）
+  void _resetTranAnimation() {
+    if (!mounted) {
+      return;
+    }
     _translationAnimation = Tween<Offset>(
       begin: Offset.zero,
       end: Offset.zero,
@@ -755,6 +964,18 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         reverseCurve: widget.childTranslateCurve,
       ),
     );
+    _translationController.reset();
+  }
+
+  ///隐藏完成：移除 shell、复位状态（可重入，仅执行一次）
+  void _onHideSuccess() {
+    if (!_isLayerShow && !_isDialogShow) {
+      return;
+    }
+
+    _cleanupPopupShell();
+    _resetTranAnimation();
+
     if (mounted) {
       setState(() {});
     }
@@ -808,7 +1029,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (widget.barrierDismissible) {
-          _hideOverlay();
+          _menuController.hide(animated: true);
         }
       },
       child: _buildContent(),
@@ -822,8 +1043,8 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     /// 构建菜单
     _cacheMenus ??= widget.menusBuilder(
       context,
-      _menuController!,
-      _menuController!.data,
+      _menuController,
+      _menuController.data,
     );
 
     /// offset
@@ -953,14 +1174,13 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// build header
   /// 构建头部，Header只需要一个渐变动画就行
   Widget _buildHeader(bool showDown) {
-    final Widget header =
-        (_menuController != null && widget.headerBuilder != null)
-            ? widget.headerBuilder!.call(
-                context,
-                _menuController!,
-                _menuController!.data,
-              )
-            : const SizedBox.shrink();
+    final Widget header = (widget.headerBuilder != null)
+        ? widget.headerBuilder!.call(
+            context,
+            _menuController,
+            _menuController.data,
+          )
+        : const SizedBox.shrink();
     return Offstage(
       offstage: (_currentHeaderRect == null),
       child: UnconstrainedBox(
@@ -1055,19 +1275,14 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     final Widget childView = SizedBox(
       width: _currentChildRect.width,
       height: _currentChildRect.height,
-      child: Visibility(
-        visible: widget.showChildTop,
-        maintainState: true,
-        maintainSize: true,
-        maintainAnimation: true,
-        maintainSemantics: true,
-        child: IgnorePointer(
-          child: HeroMode(
-            enabled: false,
-            child: widget.child,
-          ),
-        ),
-      ),
+      child: widget.showChildTop
+          ? IgnorePointer(
+              child: HeroMode(
+                enabled: false,
+                child: _buildChild(),
+              ),
+            )
+          : const SizedBox.shrink(),
     );
 
     ///构建menu
@@ -1127,7 +1342,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// update translation animation
   /// 更新平移动画
   void _updateTranslationAnimation(Offset newBeginOffset) {
-    if (_translationHiding) {
+    if (!mounted || _translationHiding) {
       return;
     }
     if (_translationBeginOffset == newBeginOffset) {

@@ -1,3 +1,3 @@
 ## 2.0.0
 
-1. 修改bubble_popup_menu.dart整体实现逻辑，增加展示动画。
+1. Add type BubblePopupMenuType.dialog for BubblePopupMenu. In this way,the popup will not show above new route anymore.

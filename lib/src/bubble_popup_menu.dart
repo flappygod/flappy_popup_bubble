@@ -84,6 +84,14 @@ typedef BubblePopupMenuHeaderBuilder<T> = Widget Function(
   T? data,
 );
 
+/// build child
+/// 构建 child
+typedef BubblePopupMenuChildBuilder<T> = Widget Function(
+  BuildContext context,
+  BubblePopupMenuController<T> controller,
+  T? data,
+);
+
 /// pop feed animation alpha controller
 /// 弹窗控制器
 class BubblePopupMenuController<T> {
@@ -180,6 +188,10 @@ class BubblePopupMenu<T> extends StatefulWidget {
   /// 头部构建器
   final BubblePopupMenuHeaderBuilder<T>? headerBuilder;
 
+  /// child builder
+  /// child 构建器
+  final BubblePopupMenuChildBuilder<T>? childBuilder;
+
   /// menus builder
   /// 菜单构建器
   final BubblePopupMenuBuilder<T> menusBuilder;
@@ -190,7 +202,7 @@ class BubblePopupMenu<T> extends StatefulWidget {
 
   /// child widget
   /// 触发弹窗的子组件
-  final Widget child;
+  final Widget? child;
 
   /// menu offset and space
   /// 菜单padding
@@ -272,8 +284,9 @@ class BubblePopupMenu<T> extends StatefulWidget {
     super.key,
     this.controller,
     this.headerBuilder,
+    this.childBuilder,
     this.type = BubblePopupMenuType.layer,
-    required this.child,
+    this.child,
     required this.menusBuilder,
     this.dividerColor = Colors.black87,
     this.triggerType = BubblePopupMenuTriggerType.onLongPress,
@@ -295,7 +308,9 @@ class BubblePopupMenu<T> extends StatefulWidget {
     this.onPopupShow,
     this.onPopupHide,
     this.shouldHandlePopup,
-  }) : assert(
+  })  : assert(child != null || childBuilder != null,
+            'Either child or childBuilder must be provided.'),
+        assert(
           !translucent || !barrierDismissible,
           'When translucent is true, barrierDismissible must be false.',
         );
@@ -525,9 +540,16 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
   /// 构建child
   Widget _buildChild() {
+    final Widget child = widget.childBuilder != null
+        ? widget.childBuilder!(
+            context,
+            _menuController,
+            _menuController.data,
+          )
+        : widget.child!;
     return KeyedSubtree(
       key: _currentChildKey,
-      child: widget.child,
+      child: child,
     );
   }
 

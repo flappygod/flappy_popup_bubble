@@ -1,3 +1,3 @@
-## 2.0.1
+## 2.0.2
 
-1. Add type BubblePopupMenuType.dialog for BubblePopupMenu. In this way,the popup will not show above new route anymore.
+1. Add childBuilder for compact more situation.

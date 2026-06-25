@@ -1,35 +1,50 @@
 import 'package:flutter/material.dart';
+import 'bubble_ink_well.dart';
 
-///pop menu item
+///Popup menu item.
+///
+///基于 [PressableInkWell] 封装的气泡菜单操作项。
+///主要负责菜单项的内容布局，点击反馈、语义和按下态由
+///[PressableInkWell] 统一处理。
 class BubblePopupMenuAction extends StatelessWidget {
-  ///text
+  ///文本内容。
   final String? text;
 
-  ///text style
+  ///文本样式。
   final TextStyle? textStyle;
 
-  ///最大多少行
+  ///文本最大行数。
   final int? maxLines;
 
-  ///icon
+  ///右侧图标。
   final Widget? icon;
 
-  ///background color
+  ///背景色。
   final Color? backgroundColor;
 
-  ///on tap
+  ///点击回调。
   final VoidCallback? onTap;
 
-  ///height
+  ///宽度。
   final double width;
 
-  ///height
+  ///高度。
   final double height;
 
-  ///padding
+  ///内边距。
   final EdgeInsets padding;
+
+  ///圆角。
   final BorderRadius? borderRadius;
+
+  ///是否启用水波纹。
   final bool enableSplash;
+
+  ///是否启用按下高亮。
+  final bool enableHighlight;
+
+  ///自定义按下高亮颜色。
+  final Color? highlightColor;
 
   const BubblePopupMenuAction({
     super.key,
@@ -43,52 +58,51 @@ class BubblePopupMenuAction extends StatelessWidget {
     this.height = 50,
     this.padding = const EdgeInsets.fromLTRB(12.5, 0, 12.5, 0),
     this.borderRadius,
-    this.enableSplash = true,
+    this.enableSplash = false,
+    this.enableHighlight = true,
+    this.highlightColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Widget actionBody = InkWell(
-      onTap: onTap,
+    return PressableInkWell(
+      width: width,
+      height: height,
+      padding: padding,
+      backgroundColor: backgroundColor ?? Colors.transparent,
       borderRadius: borderRadius,
-      splashFactory: enableSplash ? null : NoSplash.splashFactory,
-      splashColor: enableSplash ? null : Colors.transparent,
-      highlightColor: enableSplash ? null : Colors.transparent,
-      hoverColor: enableSplash ? null : Colors.transparent,
-      focusColor: enableSplash ? null : Colors.transparent,
-      child: Ink(
-        width: width,
-        height: height,
-        padding: padding,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: borderRadius,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                text ?? '',
-                maxLines: maxLines,
-                overflow: TextOverflow.ellipsis,
-                style: textStyle ??
-                    const TextStyle(color: Colors.black, fontSize: 13),
-              ),
+      onTap: onTap,
+
+      ///菜单项通常不需要明显水波纹，默认关闭。
+      enableSplashEffect: enableSplash,
+
+      ///是否启用按下态高亮。
+      enablePressedEffect: enableHighlight,
+
+      ///自定义按下态颜色。
+      pressedColor: highlightColor,
+
+      ///语义上声明为按钮，并使用文本作为朗读标签。
+      semanticButton: true,
+      semanticLabel: text ?? '',
+
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              text ?? '',
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+              style: textStyle ??
+                  const TextStyle(
+                    color: Colors.black,
+                    fontSize: 13,
+                  ),
             ),
-            icon ?? const SizedBox(),
-          ],
-        ),
-      ),
-    );
-    return Semantics(
-      button: true,
-      label: text ?? '',
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: borderRadius,
-        clipBehavior: borderRadius != null ? Clip.antiAlias : Clip.none,
-        child: actionBody,
+          ),
+          icon ?? const SizedBox.shrink(),
+        ],
       ),
     );
   }

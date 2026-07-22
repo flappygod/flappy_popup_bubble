@@ -256,17 +256,25 @@ class BubblePopupMenu<T> extends StatefulWidget {
   /// 是否启用缩放动画
   final bool bubbleAnimScaleEnable;
 
-  /// anim curve
-  /// 气泡动画曲线
-  final Curve bubbleAnimCurve;
-
   /// anim duration
   /// 动画时长
   final Duration bubbleAnimDuration;
 
+  /// anim curve
+  /// 气泡动画曲线
+  final Curve bubbleAnimCurve;
+
+  /// anim curve
+  /// 气泡动画曲线
+  final Curve bubbleAnimReverseCurve;
+
   /// child curve
   /// child 平移动画曲线
   final Curve childTranslateCurve;
+
+  /// child curve
+  /// child 平移动画曲线
+  final Curve childTranslateReverseCurve;
 
   /// show callback
   /// 显示回调
@@ -288,22 +296,24 @@ class BubblePopupMenu<T> extends StatefulWidget {
     this.type = BubblePopupMenuType.layer,
     this.child,
     required this.menusBuilder,
-    this.dividerColor = Colors.black87,
+    this.dividerColor = Colors.transparent,
     this.triggerType = BubblePopupMenuTriggerType.onLongPress,
     this.barrierDismissible = true,
     this.showChildTop = false,
     this.translucent = false,
-    this.menuPadding = const EdgeInsets.fromLTRB(0, 5, 0, 5),
-    this.headerPadding = const EdgeInsets.fromLTRB(0, 5, 0, 5),
+    this.menuPadding = const EdgeInsets.fromLTRB(0, 8, 0, 8),
+    this.headerPadding = const EdgeInsets.fromLTRB(0, 8, 0, 8),
     this.boundaryPadding = EdgeInsets.zero,
     this.bubblePadding = EdgeInsets.zero,
     this.hover,
     this.align = BubblePopupMenuAlign.center,
     this.direction = BubblePopupMenuDirection.auto,
     this.bubbleAnimScaleEnable = true,
-    this.bubbleAnimDuration = const Duration(milliseconds: 300),
+    this.bubbleAnimDuration = const Duration(milliseconds: 320),
     this.bubbleAnimCurve = Curves.easeOutBack,
+    this.bubbleAnimReverseCurve = Curves.easeOutBack,
     this.childTranslateCurve = Curves.easeOutBack,
+    this.childTranslateReverseCurve = Curves.easeOutBack,
     this.background = const PopupMenuBackground.bubble(),
     this.onPopupShow,
     this.onPopupHide,
@@ -353,7 +363,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 列表侧 anchor slot，用于读取 child 全局 rect（无需 GlobalKey）
   final BubblePopupAnchorScope _anchorScope = BubblePopupAnchorScope();
 
-  /// child 的全局 key（showChildTop 时 reparent 用）
+  /// child 的全局 key（showChildTop 时在列表与弹层之间 reparent）
   final GlobalKey _currentChildKey = GlobalKey();
   Rect _currentChildRect = Rect.zero;
 
@@ -379,6 +389,19 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   bool _isDialogShow = false;
   bool _isLayerShow = false;
 
+  /// hide 收尾中，防止 removeRoute → whenComplete 重入 _onHideSuccess
+  bool _isCleaningUp = false;
+
+  /// showChildTop 时，[_currentChildKey] 当前是否挂在弹层侧。
+  ///
+  /// 生命周期：
+  /// 1. show：置 true，child 从列表 reparent 到弹层
+  /// 2. hide 收尾：先置 false 并刷新弹层，卸掉 HeroMode 下的 keyed child
+  /// 3. 下一帧再 setState，把 key 归还给列表
+  ///
+  /// 避免关闭后立刻 push 其他 route（如 EmojiTraySheet）时出现 Duplicate GlobalKey。
+  bool _popupOwnsChildKey = false;
+
   /// 当前展示的dialog
   final BubbleDialogFrameController _currentFrameController =
       BubbleDialogFrameController();
@@ -402,7 +425,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       CurvedAnimation(
         parent: _translationController,
         curve: widget.childTranslateCurve,
-        reverseCurve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateReverseCurve,
       ),
     );
 
@@ -538,7 +561,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     return _buildChild();
   }
 
-  /// 构建child
+  /// 构建弹层 / 列表中的 child，并挂上 [_currentChildKey] 以支持 showChildTop reparent。
   Widget _buildChild() {
     final Widget child = widget.childBuilder != null
         ? widget.childBuilder!(
@@ -726,13 +749,16 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       CurvedAnimation(
         parent: _translationController,
         curve: widget.childTranslateCurve,
-        reverseCurve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateReverseCurve,
       ),
     );
     _translationController.reset();
 
-    ///设置layerShow
+    /// 展示弹层；showChildTop 时由弹层持有 [_currentChildKey]
     _isLayerShow = true;
+    if (widget.showChildTop) {
+      _popupOwnsChildKey = true;
+    }
     if (mounted) {
       setState(() {});
     }
@@ -793,13 +819,16 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       CurvedAnimation(
         parent: _translationController,
         curve: widget.childTranslateCurve,
-        reverseCurve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateReverseCurve,
       ),
     );
     _translationController.reset();
 
-    ///设置layerShow
+    /// 展示 dialog；showChildTop 时由弹层持有 [_currentChildKey]
     _isDialogShow = true;
+    if (widget.showChildTop) {
+      _popupOwnsChildKey = true;
+    }
     if (mounted) {
       setState(() {});
     }
@@ -807,6 +836,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     ///系统返回与点击遮罩均走 [_hidePopUp]动画；barrier 不直接 pop 路由
     showGeneralDialog<void>(
       context: context,
+      routeSettings: const RouteSettings(name: 'BubblePopupMenuDialog'),
       useRootNavigator: true,
       barrierDismissible: false,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
@@ -873,8 +903,13 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       return;
     }
 
+    /// 弹层已被更高路由盖住时跳过退出动画，直接收尾。
+    /// 否则动画易超时，并在与上层 route 重叠的 finalize 阶段抢 [_currentChildKey]。
+    final bool coveredByOtherRoute = _currentShowDialogContext != null &&
+        !(ModalRoute.of(_currentShowDialogContext!)?.isCurrent ?? true);
+
     ///不需要动画，直接隐藏
-    if (!animated) {
+    if (!animated || coveredByOtherRoute) {
       _onHideSuccess();
       return;
     }
@@ -893,7 +928,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     ///刷新一次
     _currentFrameController.refresh();
-    List<Future> futureList = [];
+    final List<Future<dynamic>> futureList = <Future<dynamic>>[];
 
     ///回退动画
     futureList.add(_animationController.hide());
@@ -908,7 +943,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         CurvedAnimation(
           parent: _translationController,
           curve: widget.childTranslateCurve,
-          reverseCurve: widget.childTranslateCurve,
+          reverseCurve: widget.childTranslateReverseCurve,
         ),
       );
       _translationController.stop();
@@ -918,20 +953,19 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     ///回退滚动动画
     if (_scrollController.hasClients) {
-      futureList.add(_scrollController.animateTo(
-        0,
-        duration: widget.bubbleAnimDuration,
-        curve: widget.childTranslateCurve,
-      ));
+      futureList.add(
+        _scrollController.animateTo(
+          0,
+          duration: widget.bubbleAnimDuration,
+          curve: widget.childTranslateReverseCurve,
+        ),
+      );
     }
 
-    ///执行回退
+    ///执行回退；超时则直接进入收尾，避免卡在 hiding 状态
     await Future.wait(futureList).timeout(
       widget.bubbleAnimDuration,
-      onTimeout: () {
-        debugPrint('Future.wait timeout: ${widget.bubbleAnimDuration}');
-        return [];
-      },
+      onTimeout: () => <dynamic>[],
     );
 
     if (!mounted) {
@@ -944,30 +978,31 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
   /// 移除 overlay / dialog 并复位业务状态（不操作 [AnimationController]）
   void _cleanupPopupShell() {
-    ///如果展示了layer，这里需要清理dialog
+    /// showChildTop：先释放弹层侧 GlobalKey，再卸 route；列表归还延后到下一帧
+    if (widget.showChildTop && _popupOwnsChildKey) {
+      _popupOwnsChildKey = false;
+      _currentFrameController.refresh();
+    }
+
     if (_isLayerShow) {
       _currentShowOverlay?.remove();
       _currentShowOverlay = null;
       _isLayerShow = false;
     }
 
-    ///如果展示了dialog，这里需要清理dialog
     if (_isDialogShow) {
-      _isDialogShow = false;
+      /// 先 removeRoute，再清标记，避免列表与弹层同帧挂同一 GlobalKey
       _popDialogRouteIfNeeded();
+      _isDialogShow = false;
     }
 
-    ///清空为isShow false
     _menuController._currentIsShow = false;
-
-    ///清理数据
     _menuController._clearData();
     _translationHiding = false;
     _currentPopupRect = null;
     _currentHeaderRect = null;
     _cacheMenus = null;
-
-    ///动画归位
+    _popupOwnsChildKey = false;
     _translationBeginOffset = Offset.zero;
   }
 
@@ -983,25 +1018,43 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       CurvedAnimation(
         parent: _translationController,
         curve: widget.childTranslateCurve,
-        reverseCurve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateReverseCurve,
       ),
     );
     _translationController.reset();
   }
 
-  ///隐藏完成：移除 shell、复位状态（可重入，仅执行一次）
+  /// 隐藏完成：移除 shell、复位状态（可重入，仅执行一次）
   void _onHideSuccess() {
+    if (_isCleaningUp) {
+      return;
+    }
     if (!_isLayerShow && !_isDialogShow) {
       return;
     }
+    _isCleaningUp = true;
+    final bool deferChildReclaim = widget.showChildTop;
+    try {
+      _cleanupPopupShell();
+      _resetTranAnimation();
+      void finish() {
+        if (mounted) {
+          setState(() {});
+        }
+        widget.onPopupHide?.call();
+        _isCleaningUp = false;
+      }
 
-    _cleanupPopupShell();
-    _resetTranAnimation();
-
-    if (mounted) {
-      setState(() {});
+      if (deferChildReclaim) {
+        /// 等本帧弹层卸载完成，再让列表挂回 [_currentChildKey]
+        WidgetsBinding.instance.addPostFrameCallback((_) => finish());
+      } else {
+        finish();
+      }
+    } catch (_) {
+      _isCleaningUp = false;
+      rethrow;
     }
-    widget.onPopupHide?.call();
   }
 
   /// divider height
@@ -1204,14 +1257,13 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
           )
         : const SizedBox.shrink();
     return Offstage(
-      offstage: (_currentHeaderRect == null),
+      offstage: _currentHeaderRect == null,
       child: UnconstrainedBox(
         child: Padding(
           key: _popupHeaderKey,
           padding: widget.headerPadding,
           child: AnimatedBuilder(
-            animation: _animationController.listenable ??
-                const AlwaysStoppedAnimation(0),
+            animation: _animationController.listenable,
             builder: (context, child) {
               return Opacity(
                 opacity: _animationController.value,
@@ -1244,7 +1296,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         break;
     }
     return Offstage(
-      offstage: (_currentPopupRect == null),
+      offstage: _currentPopupRect == null,
       child: UnconstrainedBox(
         child: Padding(
           key: _popupMenuKey,
@@ -1252,8 +1304,10 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
           child: BubblePopupAnimation(
             controller: _animationController,
             enableScale: widget.bubbleAnimScaleEnable,
-            curve: widget.bubbleAnimCurve,
-            reverseCurve: widget.bubbleAnimCurve,
+            fadeShowCurve: widget.bubbleAnimCurve,
+            fadeHideCurve: widget.bubbleAnimReverseCurve,
+            scaleShowCurve: widget.bubbleAnimCurve,
+            scaleHideCurve: widget.bubbleAnimReverseCurve,
             duration: widget.bubbleAnimDuration,
             scaleAlignment: animAlign,
             child: _buildOverlayPopContent(
@@ -1293,7 +1347,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     ///顶部的view
     final Widget headerView = _buildHeader(showDown);
 
-    ///子类的view
+    /// 弹层中的 child 预览（showChildTop）
     final Widget childView = SizedBox(
       width: _currentChildRect.width,
       height: _currentChildRect.height,
@@ -1301,7 +1355,11 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
           ? IgnorePointer(
               child: HeroMode(
                 enabled: false,
-                child: _buildChild(),
+
+                /// 仅在弹层持有 key 时挂载；收尾释放后改为占位，避免与列表双挂
+                child: _popupOwnsChildKey
+                    ? _buildChild()
+                    : const SizedBox.shrink(),
               ),
             )
           : const SizedBox.shrink(),
@@ -1378,7 +1436,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       CurvedAnimation(
         parent: _translationController,
         curve: widget.childTranslateCurve,
-        reverseCurve: widget.childTranslateCurve,
+        reverseCurve: widget.childTranslateReverseCurve,
       ),
     );
     _translationController
@@ -1396,7 +1454,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     return BubblePopupAnimation(
       controller: _animationHoverController,
       duration: widget.bubbleAnimDuration,
-      child: widget.hover!,
+      child: widget.hover,
     );
   }
 

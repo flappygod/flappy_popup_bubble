@@ -1,157 +1,224 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-/// Pop feed animation alpha controller
-/// 弹窗动画控制器
+/// Bubble popup animation controller
+/// 气泡弹窗动画控制器
 ///
-/// 该控制器本身不直接创建动画，而是作为外部统一控制入口，
-/// 持有内部 [AnimationController] 的引用，供外部调用 show / hide。
+/// 该控制器作为外部统一控制入口：
+/// - 提供 show / hide 方法
+/// - 提供当前动画值 value
+/// - 提供是否可见 isVisible
+/// - 提供是否正在执行动画 isAnimating
+/// - 自身实现了 [ChangeNotifier]，因此也可直接作为 [Listenable] 使用
 ///
-/// 典型用途：
-/// - 由外部在弹窗显示时调用 [show]
-/// - 在弹窗隐藏时调用 [hide]
-/// - 在需要读取当前动画进度时使用 [value]
-/// - 在需要监听动画刷新的场景下使用 [listenable]
+/// 与传统“直接暴露 AnimationController”的方式不同，
+/// 这里 controller 不再持有单一的 AnimationController，
+/// 而是由内部 State 维护两个控制器：
+/// - 一个负责 show
+/// - 一个负责 hide
+///
+/// 这样做的好处是：
+/// 1. show / hide 逻辑完全分离；
+/// 2. hide 时可以从“当前值”开始，而不是依赖 reverse；
+/// 3. 避免复杂 reverseCurve 在中途打断时产生异常视觉效果；
+/// 4. 外部仍可通过 [listenable] 监听动画逐帧变化。
 ///
 /// 注意：
-/// 1. 当前实现是“一对一绑定”；
-/// 2. 一个 [BubblePopupAnimationController] 只能绑定一个内部
-///    [AnimationController]；
-/// 3. 如果多个 [BubblePopupAnimation] 共用同一个 controller，
-///    后绑定的实例会覆盖前一个绑定。
-class BubblePopupAnimationController {
-  /// Internal animation controller
-  /// 内部真正执行动画的控制器
-  AnimationController? _animationController;
+/// - controller.value 表示“可见进度”，范围固定为 0.0 ~ 1.0；
+/// - scale 动画内部允许大于 1.0，以保留如 easeOutBack 的 overshoot 效果。
+class BubblePopupAnimationController extends ChangeNotifier {
+  /// Bound widget state
+  /// 当前绑定的动画组件状态对象
+  _BubblePopupAnimationState? _state;
 
-  /// Whether target state is showing
-  /// 当前目标状态是否为显示
+  /// Target animation state
+  /// 当前目标状态
   ///
-  /// true 表示目标状态为显示；
-  /// false 表示目标状态为隐藏。
-  ///
-  /// 当 widget 初始化时，如果该值已经为 true，
-  /// 对应动画组件会自动执行 forward。
+  /// true 表示目标为显示；
+  /// false 表示目标为隐藏。
   bool animation;
+
+  /// Current visible progress
+  /// 当前可见进度值，范围固定为 0.0 ~ 1.0
+  double _value;
+
+  /// Whether animation is running
+  /// 当前是否正在执行动画
+  bool _isAnimating;
+
+  /// Whether popup is fully visible
+  /// 当前是否已经完全显示
+  bool _isVisible;
 
   BubblePopupAnimationController({
     this.animation = false,
-  });
+  })  : _value = animation ? 1.0 : 0.0,
+        _isAnimating = false,
+        _isVisible = animation;
 
-  /// Bind internal animation controller
-  /// 绑定内部动画控制器
+  /// Bind state
+  /// 绑定内部状态对象
   ///
-  /// 该方法通常由 [BubblePopupAnimation] 在生命周期中调用，
-  /// 一般不建议业务层手动调用。
-  ///
-  /// 当 widget 销毁或 controller 变更时，也会传入 null 解除绑定。
-  void setAnimationController(AnimationController? controller) {
-    _animationController = controller;
+  /// 由 [BubblePopupAnimation] 在生命周期中自动调用。
+  void _bind(_BubblePopupAnimationState? state) {
+    _state = state;
+    _syncFromState();
   }
 
-  /// Whether animation is fully visible
-  /// 当前动画是否已经完全显示
+  /// Sync controller state
+  /// 同步控制器状态
   ///
-  /// 当内部 controller 处于 [AnimationStatus.completed] 时返回 true。
-  /// 如果当前没有绑定 controller，则返回 false。
-  bool get isVisible => _animationController?.isCompleted ?? false;
+  /// 仅当状态发生变化时才触发 [notifyListeners]。
+  void _sync({
+    required double value,
+    required bool isAnimating,
+    required bool isVisible,
+  }) {
+    final bool changed = _value != value ||
+        _isAnimating != isAnimating ||
+        _isVisible != isVisible;
 
-  /// Current animation progress
-  /// 当前动画进度值
-  ///
-  /// 返回范围通常为 0.0 ~ 1.0：
-  /// - 0.0 表示完全隐藏
-  /// - 1.0 表示完全显示
-  ///
-  /// 当内部 controller 尚未绑定时：
-  /// - 如果 [animation] 为 true，则返回 1.0
-  /// - 如果 [animation] 为 false，则返回 0.0
-  ///
-  /// 这样可以在某些首帧或未挂载场景下，仍然得到一个合理的状态值。
-  double get value => _animationController?.value ?? (animation ? 1.0 : 0.0);
+    _value = value;
+    _isAnimating = isAnimating;
+    _isVisible = isVisible;
 
-  /// Animation listenable object
-  /// 动画监听对象
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  /// Sync from bound state
+  /// 从当前绑定的 State 同步状态
+  void _syncFromState() {
+    final state = _state;
+    if (state == null) {
+      _sync(
+        value: animation ? 1.0 : 0.0,
+        isAnimating: false,
+        isVisible: animation,
+      );
+      return;
+    }
+
+    _sync(
+      value: state.currentValue.clamp(0.0, 1.0).toDouble(),
+      isAnimating: state.isAnimating,
+      isVisible: state.currentValue >= 1.0,
+    );
+  }
+
+  /// Whether popup is fully visible
+  /// 当前是否已经完全显示
+  bool get isVisible => _isVisible;
+
+  /// Current visible progress
+  /// 当前可见进度值，范围固定为 0.0 ~ 1.0
+  double get value => _value;
+
+  /// Listenable object
+  /// 监听对象
   ///
-  /// 可用于 [AnimatedBuilder]、[ListenableBuilder] 等需要监听刷新的场景。
-  ///
-  /// 例如：
-  /// ```dart
-  /// AnimatedBuilder(
-  ///   animation: controller.listenable ?? const AlwaysStoppedAnimation(0),
-  ///   builder: (context, child) {
-  ///     return Opacity(
-  ///       opacity: controller.value,
-  ///       child: child,
-  ///     );
-  ///   },
-  /// )
-  /// ```
-  ///
-  /// 如果当前尚未绑定内部 controller，则返回 null。
-  Listenable? get listenable => _animationController;
+  /// controller 自身继承自 [ChangeNotifier]，
+  /// 因此这里直接返回 this。
+  Listenable get listenable => this;
 
   /// Whether animation is currently running
-  /// 当前动画是否正在执行中
-  ///
-  /// 当内部 controller 正在 forward 或 reverse 时返回 true。
-  /// 如果当前没有绑定 controller，则返回 false。
-  bool get isAnimating => _animationController?.isAnimating ?? false;
+  /// 当前是否正在执行动画
+  bool get isAnimating => _isAnimating;
 
-  /// Start show animation
-  /// 播放显示动画
-  ///
-  /// 会先将 [animation] 标记为 true，
-  /// 然后驱动内部 controller 执行 forward。
-  ///
-  /// 如果当前尚未绑定内部 controller，则返回一个已完成的 Future。
-  Future show() {
+  /// Show popup
+  /// 执行显示动画
+  Future<void> show() {
     animation = true;
-    return _animationController?.forward() ?? Future.value();
+    final state = _state;
+    if (state == null) {
+      _sync(
+        value: 1,
+        isAnimating: false,
+        isVisible: true,
+      );
+      return Future.value();
+    }
+    return state.show();
   }
 
-  /// Start hide animation
-  /// 播放隐藏动画
-  ///
-  /// 会先将 [animation] 标记为 false，
-  /// 然后驱动内部 controller 执行 reverse。
-  ///
-  /// 如果当前尚未绑定内部 controller，则返回一个已完成的 Future。
-  Future hide() {
+  /// Hide popup
+  /// 执行隐藏动画
+  Future<void> hide() {
     animation = false;
-    return _animationController?.reverse() ?? Future.value();
+    final state = _state;
+    if (state == null) {
+      _sync(
+        value: 0,
+        isAnimating: false,
+        isVisible: false,
+      );
+      return Future.value();
+    }
+    return state.hide();
   }
 }
 
-/// Pop feed animation alpha
+/// Bubble popup animation widget
+/// 气泡弹窗动画组件
+///
+/// 支持：
+/// - 透明度动画（fade）
+/// - 缩放动画（scale，可选）
+///
+/// 内部使用两个控制器：
+/// - showController：负责显示动画
+/// - hideController：负责隐藏动画
+///
+/// 这样在“显示过程中立刻隐藏”时，
+/// hide 可以从当前值平滑开始，而不是依赖 reverse。
 class BubblePopupAnimation extends StatefulWidget {
-  /// Controller
+  /// External controller
+  /// 外部控制器
   final BubblePopupAnimationController controller;
 
-  /// On show
+  /// Callback when show animation completed
+  /// 显示动画完成回调
   final VoidCallback? onShow;
 
-  /// On hide
+  /// Callback when hide animation completed
+  /// 隐藏动画完成回调
   final VoidCallback? onHide;
 
-  /// Duration
+  /// Animation duration
+  /// 动画时长
   final Duration duration;
 
-  /// Curve
-  final Curve curve;
+  /// Fade show curve
+  /// 透明度显示曲线
+  final Curve fadeShowCurve;
 
-  /// Reverse curve
-  final Curve? reverseCurve;
+  /// Fade hide curve
+  /// 透明度隐藏曲线
+  final Curve fadeHideCurve;
+
+  /// Scale show curve
+  /// 缩放显示曲线
+  final Curve scaleShowCurve;
+
+  /// Scale hide curve
+  /// 缩放隐藏曲线
+  final Curve scaleHideCurve;
 
   /// Whether enable scale animation
+  /// 是否启用缩放动画
   final bool enableScale;
 
   /// Begin scale value
+  /// 缩放起始值
   final double beginScale;
 
   /// Scale alignment
+  /// 缩放对齐点
   final Alignment scaleAlignment;
 
-  /// Child
+  /// Child widget
+  /// 子组件
   final Widget? child;
 
   const BubblePopupAnimation({
@@ -160,97 +227,271 @@ class BubblePopupAnimation extends StatefulWidget {
     this.onShow,
     this.onHide,
     this.duration = const Duration(milliseconds: 260),
-    this.curve = Curves.easeOut,
-    this.reverseCurve,
+    this.fadeShowCurve = Curves.easeOut,
+    this.fadeHideCurve = Curves.easeIn,
+    this.scaleShowCurve = Curves.easeOutBack,
+    this.scaleHideCurve = Curves.easeInCubic,
     this.enableScale = false,
-    this.beginScale = 0.2,
+    this.beginScale = 0.0,
     this.scaleAlignment = Alignment.center,
     this.child,
-  }) : assert(beginScale > 0, 'beginScale must be greater than 0.');
+  });
 
   @override
   State<BubblePopupAnimation> createState() => _BubblePopupAnimationState();
 }
 
-/// Pop feed animation alpha state
+/// Bubble popup animation state
+/// 气泡弹窗动画状态实现
 class _BubblePopupAnimationState extends State<BubblePopupAnimation>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+    with TickerProviderStateMixin {
+  /// Show controller
+  /// 显示动画控制器
+  late final AnimationController _showController;
+
+  /// Hide controller
+  /// 隐藏动画控制器
+  late final AnimationController _hideController;
+
+  /// Fade animation used when showing
+  /// 显示时使用的透明度动画
+  late Animation<double> _fadeShowAnimation;
+
+  /// Fade animation used when hiding
+  /// 隐藏时使用的透明度动画
+  late Animation<double> _fadeHideAnimation;
+
+  /// Scale animation used when showing
+  /// 显示时使用的缩放动画
+  late Animation<double> _scaleShowAnimation;
+
+  /// Scale animation used when hiding
+  /// 隐藏时使用的缩放动画
+  late Animation<double> _scaleHideAnimation;
+
+  /// Whether current active phase is hiding
+  /// 当前是否处于隐藏阶段
+  bool _isHiding = false;
+
+  /// Current fade progress
+  /// 当前透明度进度值
+  ///
+  /// 注意：
+  /// 该值用于 opacity，因此在使用时应限制在 0.0 ~ 1.0。
+  double get currentValue {
+    if (_isHiding) {
+      return _fadeHideAnimation.value;
+    }
+    return _fadeShowAnimation.value;
+  }
+
+  /// Whether any animation is running
+  /// 当前是否有任一动画控制器正在执行
+  bool get isAnimating =>
+      _showController.isAnimating || _hideController.isAnimating;
+
+  /// Current scale progress
+  /// 当前缩放进度值
+  ///
+  /// 注意：
+  /// 该值允许大于 1.0，以保留 overshoot 效果。
+  double get currentScaleValue {
+    if (_isHiding) {
+      return _scaleHideAnimation.value;
+    }
+    return _scaleShowAnimation.value;
+  }
 
   @override
   void initState() {
     super.initState();
 
-    _animationController = AnimationController(
+    _showController = AnimationController(
       duration: widget.duration,
-      reverseDuration: widget.duration,
       vsync: this,
     );
-    widget.controller.setAnimationController(_animationController);
-    _buildAnimation();
-    _animationController.addStatusListener((status) {
+
+    _hideController = AnimationController(
+      duration: widget.duration,
+      vsync: this,
+    );
+
+    /// 初始化静态动画值，避免首帧访问未初始化 animation.value
+    final double initialValue = widget.controller.animation ? 1.0 : 0.0;
+    _fadeShowAnimation = AlwaysStoppedAnimation(initialValue);
+    _fadeHideAnimation = AlwaysStoppedAnimation(initialValue);
+    _scaleShowAnimation = AlwaysStoppedAnimation(initialValue);
+    _scaleHideAnimation = AlwaysStoppedAnimation(initialValue);
+
+    _showController.addListener(_handleTick);
+    _hideController.addListener(_handleTick);
+
+    _showController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
+        widget.controller._sync(
+          value: 1,
+          isAnimating: false,
+          isVisible: true,
+        );
         widget.onShow?.call();
-      } else if (status == AnimationStatus.dismissed) {
+      }
+    });
+
+    _hideController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.controller._sync(
+          value: 0,
+          isAnimating: false,
+          isVisible: false,
+        );
         widget.onHide?.call();
       }
     });
-    if (widget.controller.animation) {
-      _animationController.forward();
+
+    widget.controller._bind(this);
+  }
+
+  /// Handle animation tick
+  /// 处理动画逐帧刷新
+  ///
+  /// controller 对外同步的是“可见进度”，因此这里仍限制在 0~1。
+  void _handleTick() {
+    if (!mounted) return;
+    widget.controller._sync(
+      value: currentValue.clamp(0.0, 1.0).toDouble(),
+      isAnimating: isAnimating,
+      isVisible: currentValue >= 1.0,
+    );
+    setState(() {});
+  }
+
+  /// Start show animation
+  /// 执行显示动画
+  ///
+  /// 特点：
+  /// - fade 从当前可见进度开始
+  /// - scale 从当前缩放进度开始
+  /// - scale 允许大于 1.0
+  /// - 返回的 Future 会在动画真正完成后结束
+  Future<void> show() async {
+    final double startFade = currentValue.clamp(0.0, 1.0).toDouble();
+    final double startScale = math.max(0, currentScaleValue);
+
+    _hideController.stop();
+    _showController.stop();
+
+    _isHiding = false;
+
+    _fadeShowAnimation = Tween<double>(
+      begin: startFade,
+      end: 1,
+    ).animate(
+      CurvedAnimation(
+        parent: _showController,
+        curve: widget.fadeShowCurve,
+      ),
+    );
+
+    _scaleShowAnimation = Tween<double>(
+      begin: startScale,
+      end: 1,
+    ).animate(
+      CurvedAnimation(
+        parent: _showController,
+        curve: widget.scaleShowCurve,
+      ),
+    );
+
+    _showController.value = 0.0;
+    _handleTick();
+
+    try {
+      await _showController.forward().orCancel;
+    } on TickerCanceled {
+// ignore
     }
   }
 
-  void _buildAnimation() {
-    final Animation<double> curved = CurvedAnimation(
-      parent: _animationController,
-      curve: widget.curve,
-      reverseCurve: widget.reverseCurve ?? widget.curve.flipped,
+  /// Start hide animation
+  /// 执行隐藏动画
+  ///
+  /// 特点：
+  /// - fade 从当前可见进度开始
+  /// - scale 从当前缩放进度开始
+  /// - scale 起点允许大于 1.0
+  /// - 返回的 Future 会在动画真正完成后结束
+  Future<void> hide() async {
+    final double startFade = currentValue.clamp(0.0, 1.0).toDouble();
+    final double startScale = math.max(0, currentScaleValue);
+
+    _showController.stop();
+    _hideController.stop();
+
+    _isHiding = true;
+
+    _fadeHideAnimation = Tween<double>(
+      begin: startFade,
+      end: 0,
+    ).animate(
+      CurvedAnimation(
+        parent: _hideController,
+        curve: widget.fadeHideCurve,
+      ),
     );
 
-    _fadeAnimation = curved;
-    _scaleAnimation = Tween<double>(
-      begin: widget.beginScale,
-      end: 1.0,
-    ).animate(curved);
+    _scaleHideAnimation = Tween<double>(
+      begin: startScale,
+      end: 0,
+    ).animate(
+      CurvedAnimation(
+        parent: _hideController,
+        curve: widget.scaleHideCurve,
+      ),
+    );
+
+    _hideController.value = 0.0;
+    _handleTick();
+
+    try {
+      await _hideController.forward().orCancel;
+    } on TickerCanceled {
+// ignore
+    }
+  }
+
+  /// Map scale progress to actual scale value
+  /// 将缩放进度映射为真实 scale 值
+  ///
+  /// 说明：
+  /// - t = 0   -> beginScale
+  /// - t = 1   -> 1.0
+  /// - t > 1   -> 大于 1.0（保留 overshoot）
+  double _mapScale(double t) {
+    return widget.beginScale + (1 - widget.beginScale) * t;
   }
 
   @override
   void didUpdateWidget(covariant BubblePopupAnimation oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    /// 设置 duration
     if (oldWidget.duration != widget.duration) {
-      _animationController.duration = widget.duration;
-      _animationController.reverseDuration = widget.duration;
+      _showController.duration = widget.duration;
+      _hideController.duration = widget.duration;
     }
 
-    /// 重新创建 animation
-    if (oldWidget.curve != widget.curve ||
-        oldWidget.reverseCurve != widget.reverseCurve ||
-        oldWidget.beginScale != widget.beginScale) {
-      _buildAnimation();
-    }
-
-    /// controller 变化了
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.setAnimationController(null);
-      widget.controller.setAnimationController(_animationController);
-
-      if (widget.controller.animation && !_animationController.isCompleted) {
-        _animationController.forward();
-      } else if (!widget.controller.animation &&
-          !_animationController.isDismissed) {
-        _animationController.reverse();
-      }
+      oldWidget.controller._bind(null);
+      widget.controller._bind(this);
     }
   }
 
   @override
   void dispose() {
-    widget.controller.setAnimationController(null);
-    _animationController.dispose();
+    widget.controller._bind(null);
+    _showController.removeListener(_handleTick);
+    _hideController.removeListener(_handleTick);
+    _showController.dispose();
+    _hideController.dispose();
     super.dispose();
   }
 
@@ -258,35 +499,32 @@ class _BubblePopupAnimationState extends State<BubblePopupAnimation>
   Widget build(BuildContext context) {
     final Widget child = widget.child ?? const SizedBox();
 
-    ///渐变
-    Widget animatedChild = FadeTransition(
-      opacity: _fadeAnimation,
+    /// opacity 必须限制在 0~1
+    final double opacity = currentValue.clamp(0.0, 1.0).toDouble();
+
+    /// scale 允许大于 1，以保留 overshoot
+    final double scaleProgress = math.max(0, currentScaleValue);
+
+    Widget animatedChild = Opacity(
+      opacity: opacity,
       child: child,
     );
 
-    ///开启大小
     if (widget.enableScale) {
-      animatedChild = ScaleTransition(
-        scale: _scaleAnimation,
+      animatedChild = Transform.scale(
+        scale: _mapScale(scaleProgress),
         alignment: widget.scaleAlignment,
         child: animatedChild,
       );
     }
 
-    ///构建
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, _) {
-        final bool hidden = _animationController.value == 0;
-        return Visibility(
-          visible: !hidden,
-          maintainSemantics: true,
-          maintainAnimation: true,
-          maintainSize: true,
-          maintainState: true,
-          child: animatedChild,
-        );
-      },
+    return Visibility(
+      visible: opacity > 0.0,
+      maintainSemantics: true,
+      maintainAnimation: true,
+      maintainSize: true,
+      maintainState: true,
+      child: animatedChild,
     );
   }
 }

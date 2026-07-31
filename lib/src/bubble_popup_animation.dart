@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
 
 /// Bubble popup animation controller
 /// 气泡弹窗动画控制器
@@ -156,6 +156,22 @@ class BubblePopupAnimationController extends ChangeNotifier {
       return Future.value();
     }
     return state.hide();
+  }
+
+  /// Instantly reset to hidden baseline without playing hide animation.
+  /// 无动画复位到隐藏基准态，避免下次 show 从 value=1 起跳。
+  void resetToHidden() {
+    animation = false;
+    final state = _state;
+    if (state != null) {
+      state._jumpToHidden();
+    } else {
+      _sync(
+        value: 0,
+        isAnimating: false,
+        isVisible: false,
+      );
+    }
   }
 }
 
@@ -456,6 +472,25 @@ class _BubblePopupAnimationState extends State<BubblePopupAnimation>
       await _hideController.forward().orCancel;
     } on TickerCanceled {
 // ignore
+    }
+  }
+
+  /// Jump to fully hidden without playing hide animation.
+  /// 无动画跳到完全隐藏态。
+  void _jumpToHidden() {
+    _showController.stop();
+    _hideController.stop();
+    _isHiding = true;
+    _fadeHideAnimation = const AlwaysStoppedAnimation(0);
+    _scaleHideAnimation = const AlwaysStoppedAnimation(0);
+    _hideController.value = 0.0;
+    widget.controller._sync(
+      value: 0,
+      isAnimating: false,
+      isVisible: false,
+    );
+    if (mounted) {
+      setState(() {});
     }
   }
 

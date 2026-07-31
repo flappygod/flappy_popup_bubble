@@ -1,3 +1,3 @@
-## 2.0.2
+## 2.0.3
 
-1. Add childBuilder for compact more situation.
+1. Add BubblePopupMenuLayoutMode.overlay.

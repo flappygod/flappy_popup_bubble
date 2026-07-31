@@ -59,7 +59,7 @@ class BubbleHoverBlurView extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       borderRadius: borderRadius ?? BorderRadius.zero,
       child: BackdropFilter(
-        filter: filter ?? ImageFilter.blur(sigmaX: 25.0, sigmaY: 25.0),
+        filter: filter ?? ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: _buildBaseContainer(),
       ),
     );

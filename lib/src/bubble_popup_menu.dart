@@ -38,6 +38,18 @@ enum BubblePopupMenuDirection {
   down,
 }
 
+/// popup content layout mode
+/// 弹层内容布局模式
+enum BubblePopupMenuLayoutMode {
+  /// 可滚动：沿用原有 Column + 位移 + 滚动逻辑
+  scroll,
+
+  /// 可轻微回弹滚动：沿用 scroll 模式的布局和动画；
+  /// 总高度超过可视区时，将操作菜单向 child 方向平移并叠在其上方；
+  /// 滚动上限按 menu translate 后的真实视觉边界计算，避免高 child 滚动不全或滚动过量。
+  overlay,
+}
+
 /// bubble options
 /// 气泡样式配置
 class PopupBubbleOptions {
@@ -252,6 +264,22 @@ class BubblePopupMenu<T> extends StatefulWidget {
   /// 弹出方向
   final BubblePopupMenuDirection direction;
 
+  /// content layout mode
+  /// 内容布局模式
+  final BubblePopupMenuLayoutMode layoutMode;
+
+  /// Whether the header and menu fade out after overlay content scrolls more than 10 logical pixels.
+  ///
+  /// 仅在 [BubblePopupMenuLayoutMode.overlay] 下生效。滚动距离大于 10 时隐藏
+  /// header 和 menu，回到 10 以内时重新展示。
+  final bool autoHideEdgeItemsOnScroll;
+
+  /// Whether to correct the maximum scroll extent using the translated visual boundary.
+  ///
+  /// 仅在 [BubblePopupMenuLayoutMode.overlay] 下生效。默认关闭，使用 Flutter
+  /// 根据原始布局计算的最大滚动距离；开启后按 menu 平移后的视觉边界收紧滚动上限。
+  final bool correctOverlayMaxScrollExtent;
+
   /// enable anim scale
   /// 是否启用缩放动画
   final bool bubbleAnimScaleEnable;
@@ -308,6 +336,9 @@ class BubblePopupMenu<T> extends StatefulWidget {
     this.hover,
     this.align = BubblePopupMenuAlign.center,
     this.direction = BubblePopupMenuDirection.auto,
+    this.layoutMode = BubblePopupMenuLayoutMode.scroll,
+    this.autoHideEdgeItemsOnScroll = true,
+    this.correctOverlayMaxScrollExtent = true,
     this.bubbleAnimScaleEnable = true,
     this.bubbleAnimDuration = const Duration(milliseconds: 320),
     this.bubbleAnimCurve = Curves.easeOutBack,
@@ -350,8 +381,25 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       BubblePopupAnimationController();
 
   /// scroll controller
-  /// 滚动控制器
-  final ScrollController _scrollController = ScrollController();
+  /// 滚动控制器：
+  /// 1. 监听滚动距离，控制 overlay 模式下 header / menu 的渐隐渐显；
+  /// 2. 可根据 [BubblePopupMenu.correctOverlayMaxScrollExtent] 修正最大滚动距离。
+  final _BubblePopupScrollController _scrollController =
+      _BubblePopupScrollController();
+
+  /// header / menu 自动隐藏的滚动阈值（逻辑像素）。
+  static const double _edgeItemsHideScrollThreshold = 10;
+
+  /// 当前是否展示滚动内容两端的 header 和 menu。
+  ///
+  /// 仅改变透明度和点击能力，不从布局树移除，避免滚动范围发生跳变。
+  bool _showEdgeItems = true;
+
+  /// 当前弹层内容是否正在拖动或惯性滚动。
+  ///
+  /// 滚动期间强制隐藏 header / menu，避免 offset 在阈值附近或回弹过程中
+  /// 反复跨越 10px，导致边缘内容闪烁。
+  bool _isPopupScrolling = false;
 
   /// translation controller
   /// 平移动画控制器
@@ -412,6 +460,10 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   @override
   void initState() {
     super.initState();
+
+    /// 直接监听内部 ScrollController，不依赖弹层由 dialog 还是 layer 承载；
+    /// 是否真正启用自动隐藏由 layoutMode 和参数共同决定。
+    _scrollController.addListener(_handlePopupScroll);
 
     ///位移动画初始化
     _translationController = AnimationController(
@@ -503,6 +555,20 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       _hidePopUp(animated: false);
     }
 
+    /// 自动隐藏参数或布局模式变化时，立即同步 header / menu 状态。
+    if (oldWidget.autoHideEdgeItemsOnScroll !=
+            widget.autoHideEdgeItemsOnScroll ||
+        oldWidget.layoutMode != widget.layoutMode) {
+      _updateEdgeItemsVisibility();
+    }
+
+    /// 修正参数变化时刷新弹层，重新执行 ScrollPosition 的内容尺寸计算。
+    if (oldWidget.correctOverlayMaxScrollExtent !=
+            widget.correctOverlayMaxScrollExtent &&
+        (_isLayerShow || _isDialogShow)) {
+      _currentFrameController.refresh();
+    }
+
     super.didUpdateWidget(oldWidget);
   }
 
@@ -511,8 +577,65 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     _menuController.removeListener(_listener);
     _cleanupPopupShell();
     _translationController.dispose();
+
+    /// 先解除监听再释放 controller，避免销毁阶段继续刷新弹层。
+    _scrollController.removeListener(_handlePopupScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 处理弹层内部滚动。
+  ///
+  /// 收起动画期间会主动回滚 scroll offset，此时不应让 header / menu
+  /// 重新出现，否则退出动画过程中可能闪烁。
+  void _handlePopupScroll() {
+    if (_translationHiding) {
+      return;
+    }
+    _updateEdgeItemsVisibility();
+  }
+
+  /// 根据当前滚动距离同步 header / menu 的可见状态。
+  ///
+  /// 仅在 overlay 模式且 [BubblePopupMenu.autoHideEdgeItemsOnScroll] 开启时生效；
+  /// 滚动过程中始终隐藏；滚动结束后，offset 绝对值大于阈值时继续隐藏，
+  /// 回到阈值内时展示。仅在可见状态改变时刷新，避免每个滚动帧都重建弹层。
+  void _updateEdgeItemsVisibility() {
+    final bool shouldAutoHide =
+        widget.layoutMode == BubblePopupMenuLayoutMode.overlay &&
+            widget.autoHideEdgeItemsOnScroll;
+    final bool shouldShow = !shouldAutoHide ||
+        (!_isPopupScrolling &&
+            (!_scrollController.hasClients ||
+                _scrollController.offset.abs() <=
+                    _edgeItemsHideScrollThreshold));
+    if (_showEdgeItems == shouldShow) {
+      return;
+    }
+    _showEdgeItems = shouldShow;
+    if (_isLayerShow || _isDialogShow) {
+      _currentFrameController.refresh();
+    }
+  }
+
+  /// 接收滚动生命周期通知，区分“正在滚动”和“滚动已经完全停止”。
+  ///
+  /// 使用 ScrollEndNotification 而不是手势抬起事件，因此惯性滚动和回弹阶段
+  /// 也会持续保持隐藏，直到 ScrollPosition 真正稳定后才重新判断最终 offset。
+  bool _handlePopupScrollNotification(ScrollNotification notification) {
+    if (widget.layoutMode != BubblePopupMenuLayoutMode.overlay ||
+        !widget.autoHideEdgeItemsOnScroll ||
+        _translationHiding) {
+      return false;
+    }
+    if (notification is ScrollStartNotification) {
+      _isPopupScrolling = true;
+      _updateEdgeItemsVisibility();
+    } else if (notification is ScrollEndNotification) {
+      _isPopupScrolling = false;
+      _updateEdgeItemsVisibility();
+    }
+    return false;
   }
 
   @override
@@ -669,6 +792,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     );
     final Offset posLimit =
         constrainRectWithinRect(bigRect, totalRect, pos, showDown);
+
     _translationBeginOffset = Offset(
       pos.dx - posLimit.dx,
       pos.dy - posLimit.dy,
@@ -739,6 +863,10 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       return;
     }
 
+    /// 每次打开弹层都从可见状态开始，避免复用上次滚动后的隐藏状态。
+    _isPopupScrolling = false;
+    _showEdgeItems = true;
+
     /// reset translation
     /// 重置平移动画
     _translationBeginOffset = Offset.zero;
@@ -808,6 +936,10 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     if (!_updateCurrentRect()) {
       return;
     }
+
+    /// dialog 同样可能承载 overlay 布局，打开时统一复位边缘内容可见状态。
+    _isPopupScrolling = false;
+    _showEdgeItems = true;
 
     /// reset translation
     /// 重置平移动画
@@ -910,6 +1042,11 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     ///不需要动画，直接隐藏
     if (!animated || coveredByOtherRoute) {
+      /// 先把动画控制器复位到隐藏基准态，再卸 route。
+      /// 否则 dispose/_bind(null) 会按 animation=true 把 value 恢复成 1，
+      /// 导致下次长按 show 从已显示态起跳，动画与首次不一致。
+      _animationController.resetToHidden();
+      _animationHoverController.resetToHidden();
       _onHideSuccess();
       return;
     }
@@ -951,8 +1088,9 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       futureList.add(_translationController.forward());
     }
 
-    ///回退滚动动画
-    if (_scrollController.hasClients) {
+    ///回退滚动动画（仅可滚动模式）
+    if (widget.layoutMode == BubblePopupMenuLayoutMode.scroll &&
+        _scrollController.hasClients) {
       futureList.add(
         _scrollController.animateTo(
           0,
@@ -998,12 +1136,19 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     _menuController._currentIsShow = false;
     _menuController._clearData();
+
+    /// 恢复默认隐藏动画策略，避免上次 hide(animated: false) 污染后续关闭。
+    _menuController._hideAnimated = true;
     _translationHiding = false;
     _currentPopupRect = null;
     _currentHeaderRect = null;
     _cacheMenus = null;
     _popupOwnsChildKey = false;
     _translationBeginOffset = Offset.zero;
+
+    /// 清理时复位边缘内容状态，下一次展示不继承上次的滚动结果。
+    _isPopupScrolling = false;
+    _showEdgeItems = true;
   }
 
   /// 平移动画归位（须在 [AnimationController.dispose] 之前且 [mounted] 为 true 时调用）
@@ -1214,8 +1359,48 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         break;
     }
 
+    final List<Widget> menus = _cacheMenus ?? [];
+
+    /// overlay 模式不改变原布局，仅把超出可视区的 menu 向 child 方向平移。
+    final double overflowHeight = max(0, totalRect.height - bigRect.height);
+    final double menuTranslateY =
+        widget.layoutMode == BubblePopupMenuLayoutMode.overlay
+            ? overflowHeight * (showDown ? -1 : 1)
+            : 0;
+
     final double showPosX = posLimit.dx;
     final double showPosY = posLimit.dy;
+
+    /// 开启 correctOverlayMaxScrollExtent 时，按 translate 后的视觉最底部
+    /// 计算 overlay 模式的 maxScrollExtent。
+    ///
+    /// showDown 时 menu 会向上覆盖 child，不能直接从布局溢出中减去整个
+    /// overflowHeight，否则 child 很高时上限会被错误压成 0，无法滚到 child
+    /// 底部。这里分别计算未平移区域与已平移 menu 的视觉底边，取较大值。
+    if (widget.layoutMode == BubblePopupMenuLayoutMode.overlay &&
+        widget.correctOverlayMaxScrollExtent) {
+      final double visualBottomInContent;
+      if (showDown) {
+        // Column 顺序为 header → child → menu。menu 上移后可能与 child 重叠，
+        // 但 child 自身不参与 translate，因此必须保留滚到 childBottom 的距离。
+        final double childBottom = headerHeight + rect.height;
+        final double translatedMenuBottom = totalRect.height + menuTranslateY;
+        visualBottomInContent = max(childBottom, translatedMenuBottom);
+      } else {
+        // Column 顺序为 menu → child → header。menu 下移可能超出原布局底边，
+        // 所以在原布局底边与 translate 后 menu 底边之间取较大值。
+        final double translatedMenuBottom = menuHeight + menuTranslateY;
+        visualBottomInContent = max(totalRect.height, translatedMenuBottom);
+      }
+      // showPosY 是整块内容在屏幕中的起点；bigRect.bottom 是允许显示的
+      // 最低边界。两者相减即为视觉内容完全可见所需的最大滚动距离。
+      _scrollController.maxScrollExtentLimit =
+          max(0.0, showPosY + visualBottomInContent - bigRect.bottom);
+    } else {
+      /// 默认不介入 Flutter 的滚动范围计算；infinity 在自定义 ScrollPosition
+      /// 中等价于“只采用框架给出的 maxScrollExtent”。
+      _scrollController.maxScrollExtentLimit = double.infinity;
+    }
 
     /// translation animation offset
     /// 平移动画的起始偏移
@@ -1235,11 +1420,16 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         clipBehavior: Clip.none,
         children: [
           _buildOverlayHover(),
+
+          /// 空间足够：与旧模式完全同一套 Column + ScrollView + 位移动画
           _buildContentView(
             Offset(showPosX, showPosY),
             showDown,
             delta,
-            _cacheMenus ?? [],
+            menus,
+            menuTranslateY,
+            // overlay 下仅内容超出边界、menu 与 child 发生叠加时才允许滚动。
+            allowOverlayScroll: overflowHeight > 0,
           ),
         ],
       ),
@@ -1321,6 +1511,26 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     );
   }
 
+  /// 为 overlay 内容两端的 header / menu 添加滚动感知渐变。
+  ///
+  /// 使用 [AnimatedOpacity] 而非 Offstage/条件移除，确保隐藏前后占位尺寸一致；
+  /// 隐藏状态下通过 [IgnorePointer] 防止透明的功能项拦截点击。
+  Widget _buildScrollAwareEdgeItem(Widget child) {
+    if (widget.layoutMode != BubblePopupMenuLayoutMode.overlay ||
+        !widget.autoHideEdgeItemsOnScroll) {
+      return child;
+    }
+    return IgnorePointer(
+      ignoring: !_showEdgeItems,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        opacity: _showEdgeItems ? 1 : 0,
+        child: child,
+      ),
+    );
+  }
+
   /// build content view
   /// 构建内容视图
   Widget _buildContentView(
@@ -1328,7 +1538,9 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     bool showDown,
     double delta,
     List<Widget> menus,
-  ) {
+    double menuTranslateY, {
+    bool allowOverlayScroll = false,
+  }) {
     /// animation anchor and cross axis
     /// 计算动画基准方向和交叉轴对齐
     late final CrossAxisAlignment crossAxisAlignment;
@@ -1344,8 +1556,10 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         break;
     }
 
-    ///顶部的view
-    final Widget headerView = _buildHeader(showDown);
+    /// 顶部 header：滚动查看 child 时按阈值渐隐。
+    final Widget headerView = _buildScrollAwareEdgeItem(
+      _buildHeader(showDown),
+    );
 
     /// 弹层中的 child 预览（showChildTop）
     final Widget childView = SizedBox(
@@ -1365,8 +1579,14 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
           : const SizedBox.shrink(),
     );
 
-    ///构建menu
-    final Widget menuView = _buildMenu(showDown, delta, menus);
+    /// 功能 menu：Transform 必须位于 AnimatedOpacity 外层，使绘制位置和
+    /// 命中区域一起移动；否则与 child 重叠、超出原布局区域的部分无法点击。
+    final Widget menuView = Transform.translate(
+      offset: Offset(0, menuTranslateY),
+      child: _buildScrollAwareEdgeItem(
+        _buildMenu(showDown, delta, menus),
+      ),
+    );
 
     ///子类
     final List<Widget> children;
@@ -1384,35 +1604,53 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       ];
     }
 
-    ///这里返回的是真实的view
-    return SingleChildScrollView(
-      padding: EdgeInsets.zero,
-      controller: _scrollController,
-      physics: _translationHiding
-          ? const NeverScrollableScrollPhysics()
-          : const BouncingScrollPhysics(),
-      clipBehavior: Clip.none,
-      child: Container(
-        margin: EdgeInsets.fromLTRB(
-          offset.dx,
-          offset.dy,
-          //右边需要限制一下
-          widget.boundaryPadding.right,
-          //底部也需要限制一下
-          widget.boundaryPadding.bottom,
-        ),
-        child: AnimatedBuilder(
-          animation: _translationAnimation,
-          builder: (context, child) {
-            return Transform.translate(
-              offset: _translationAnimation.value,
-              child: child,
-            );
-          },
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: crossAxisAlignment,
-            children: children,
+    /// 收起位移动画期间锁定滚动。
+    /// overlay 模式仅在内容超出边界、menu 与 child 发生叠加时允许滚动回弹；
+    /// 空间足够时禁用滚动，避免短内容仍可拖动。
+    /// 是否额外收紧 maxScrollExtent 由 correctOverlayMaxScrollExtent 决定。
+    final bool lockScroll = _translationHiding;
+    final ScrollPhysics scrollPhysics;
+    if (lockScroll) {
+      scrollPhysics = const NeverScrollableScrollPhysics();
+    } else if (widget.layoutMode == BubblePopupMenuLayoutMode.overlay) {
+      scrollPhysics = allowOverlayScroll
+          ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+          : const NeverScrollableScrollPhysics();
+    } else {
+      scrollPhysics = const BouncingScrollPhysics();
+    }
+
+    /// 通过 NotificationListener 记录完整滚动生命周期；controller listener
+    /// 继续负责监听 offset，二者共同避免阈值附近反复显示/隐藏。
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handlePopupScrollNotification,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.zero,
+        controller: _scrollController,
+        physics: scrollPhysics,
+        clipBehavior: Clip.none,
+        child: Container(
+          margin: EdgeInsets.fromLTRB(
+            offset.dx,
+            offset.dy,
+            //右边需要限制一下
+            widget.boundaryPadding.right,
+            //底部也需要限制一下
+            widget.boundaryPadding.bottom,
+          ),
+          child: AnimatedBuilder(
+            animation: _translationAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: _translationAnimation.value,
+                child: child,
+              );
+            },
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: crossAxisAlignment,
+              children: children,
+            ),
           ),
         ),
       ),
@@ -1535,5 +1773,57 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       }
     }
     return Offset(newDx, newDy);
+  }
+}
+
+/// 可动态限制 [ScrollPosition.maxScrollExtent] 的控制器。
+///
+/// Transform 只改变绘制位置，不改变 ScrollView 的布局尺寸。开启
+/// [BubblePopupMenu.correctOverlayMaxScrollExtent] 后，在
+/// [ScrollPosition.applyContentDimensions] 阶段按视觉范围收紧上限。
+class _BubblePopupScrollController extends ScrollController {
+  /// 允许的最大滚动距离上限。
+  ///
+  /// 默认 infinity 表示不修正框架计算结果；仅在
+  /// [BubblePopupMenu.correctOverlayMaxScrollExtent] 开启时写入有限值。
+  double maxScrollExtentLimit = double.infinity;
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) {
+    return _BubblePopupScrollPosition(
+      physics: physics,
+      context: context,
+      oldPosition: oldPosition,
+      getMaxScrollExtentLimit: () => maxScrollExtentLimit,
+    );
+  }
+}
+
+class _BubblePopupScrollPosition extends ScrollPositionWithSingleContext {
+  _BubblePopupScrollPosition({
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+    required this.getMaxScrollExtentLimit,
+  });
+
+  /// 每次内容尺寸计算时动态读取最新上限，支持弹层展示期间修改配置。
+  final double Function() getMaxScrollExtentLimit;
+
+  @override
+  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
+    /// 参数关闭时 limit 为 infinity，limitedMax 会保持框架原始值；
+    /// 参数开启时只允许缩小上限，绝不扩张原本不可滚动的内容。
+    final double limit = getMaxScrollExtentLimit();
+    // 不扩大框架根据布局得出的范围，只允许用视觉范围进一步收紧它。
+    // BouncingScrollPhysics 仍可在边界外产生临时 overscroll，并自动回弹。
+    final double limitedMax = maxScrollExtent.isFinite
+        ? min(maxScrollExtent, limit)
+        : (limit.isFinite ? limit : 0.0);
+    return super.applyContentDimensions(minScrollExtent, max(0.0, limitedMax));
   }
 }

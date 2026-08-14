@@ -1,3 +1,3 @@
-## 2.0.3
+## 2.0.4
 
-1. Add BubblePopupMenuLayoutMode.overlay.
+1. Add BubblePopupMenuLayoutMode.fixed feature.

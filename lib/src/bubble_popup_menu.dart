@@ -48,6 +48,12 @@ enum BubblePopupMenuLayoutMode {
   /// 总高度超过可视区时，将操作菜单向 child 方向平移并叠在其上方；
   /// 滚动上限按 menu translate 后的真实视觉边界计算，避免高 child 滚动不全或滚动过量。
   overlay,
+
+  /// 固定：child / header / menu 不做边界校正位移动画，也不允许滚动；
+  /// 保持相对 child 的原始锚点位置；仍保留淡入淡出、缩放等其他动画。
+  /// 可通过 [BubblePopupMenuController.show] 的 headerTranslate /
+  /// headerBottomGlobalY 单独定位 header。
+  fixed,
 }
 
 /// bubble options
@@ -127,9 +133,28 @@ class BubblePopupMenuController<T> {
   /// 隐藏时是否播放退出动画
   bool _hideAnimated = true;
 
+  /// header 额外平移（由 [show] 传入，隐藏时清空）
+  Offset _headerTranslate = Offset.zero;
+
+  /// 将 header 底边对齐到该全局 Y（任意 layoutMode 均可）。
+  /// 覆盖 [_headerTranslate] 的 dy（dx 仍使用 [_headerTranslate.dx]）。
+  double? _headerBottomGlobalY;
+
   /// current popup data
   /// 当前弹窗数据
   T? get data => _currentData;
+
+  /// 当前 header 额外平移（未应用 headerBottomGlobalY 换算前的原始值）
+  Offset get headerTranslate => _headerTranslate;
+
+  /// header 底边目标全局 Y；为 null 表示不自动换算
+  double? get headerBottomGlobalY => _headerBottomGlobalY;
+
+  /// [show] 传入的布局模式；为 null 时回退到 [BubblePopupMenu.layoutMode]
+  BubblePopupMenuLayoutMode? _layoutModeOverride;
+
+  /// 当前 [show] 指定的布局模式（未指定则为 null）
+  BubblePopupMenuLayoutMode? get layoutModeOverride => _layoutModeOverride;
 
   /// whether popup is showing
   /// 是否正在显示弹窗
@@ -138,9 +163,25 @@ class BubblePopupMenuController<T> {
   }
 
   /// show menu
-  /// 显示菜单，可选传入数据
-  void show({T? data}) {
+  /// 显示菜单，可选传入数据、header 平移，或 header 底边目标全局 Y。
+  ///
+  /// [headerBottomGlobalY] 在任意 [layoutMode] 下均可生效，与 [headerTranslate]
+  /// 可同时传入：header 测量后会按目标 Y 重算 dy，dx 仍取 [headerTranslate.dx]。
+  ///
+  /// **传 null = 不启用定位**；传 `0` 表示对齐到屏幕顶部全局 Y=0
+  ///（会算出很大的负偏移，header 容易跑到屏外，看起来像没弹出来）。
+  ///
+  /// [layoutMode] 指定本次弹层布局模式；不传则使用 [BubblePopupMenu.layoutMode]。
+  void show({
+    T? data,
+    Offset headerTranslate = Offset.zero,
+    double? headerBottomGlobalY,
+    BubblePopupMenuLayoutMode? layoutMode,
+  }) {
     _currentData = data;
+    _headerTranslate = headerTranslate;
+    _headerBottomGlobalY = headerBottomGlobalY;
+    _layoutModeOverride = layoutMode;
     _currentIsShow = true;
     notifyListeners(_eventShow);
   }
@@ -163,6 +204,9 @@ class BubblePopupMenuController<T> {
   /// 清空当前数据
   void _clearData() {
     _currentData = null;
+    _headerTranslate = Offset.zero;
+    _headerBottomGlobalY = null;
+    _layoutModeOverride = null;
   }
 
   /// notify listener
@@ -265,7 +309,7 @@ class BubblePopupMenu<T> extends StatefulWidget {
   final BubblePopupMenuDirection direction;
 
   /// content layout mode
-  /// 内容布局模式
+  /// 内容布局模式（[BubblePopupMenuController.show] 未传 layoutMode 时使用）
   final BubblePopupMenuLayoutMode layoutMode;
 
   /// Whether the header and menu fade out after overlay content scrolls more than 10 logical pixels.
@@ -457,6 +501,26 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 当前展示的dialogRoute
   BuildContext? _currentShowDialogContext;
 
+  /// 当前生效的布局模式：[show] 传入的 layoutMode，否则 [BubblePopupMenu.layoutMode]。
+  BubblePopupMenuLayoutMode get _layoutMode {
+    return _menuController.layoutModeOverride ?? widget.layoutMode;
+  }
+
+  /// 当前生效的 header 平移。
+  ///
+  /// [BubblePopupMenuController.headerBottomGlobalY] 在任意 layoutMode 下、
+  /// header 已测量后生效：按「header 底边对齐到目标全局 Y」换算 dy。
+  Offset get _resolvedHeaderTranslate {
+    final double? targetBottom = _menuController.headerBottomGlobalY;
+    if (targetBottom == null || _currentHeaderRect == null) {
+      return _menuController.headerTranslate;
+    }
+    return Offset(
+      _menuController.headerTranslate.dx,
+      targetBottom - _currentChildRect.top,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -562,6 +626,19 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       _updateEdgeItemsVisibility();
     }
 
+    /// 切到 fixed 时清空内容位移动画状态，避免残留偏移。
+    if (oldWidget.layoutMode != widget.layoutMode &&
+        widget.layoutMode == BubblePopupMenuLayoutMode.fixed) {
+      _translationBeginOffset = Offset.zero;
+      _resetTranAnimation();
+    }
+
+    /// layoutMode 变化时刷新弹层，立即应用新定位。
+    if (oldWidget.layoutMode != widget.layoutMode &&
+        (_isLayerShow || _isDialogShow)) {
+      _currentFrameController.refresh();
+    }
+
     /// 修正参数变化时刷新弹层，重新执行 ScrollPosition 的内容尺寸计算。
     if (oldWidget.correctOverlayMaxScrollExtent !=
             widget.correctOverlayMaxScrollExtent &&
@@ -602,7 +679,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 回到阈值内时展示。仅在可见状态改变时刷新，避免每个滚动帧都重建弹层。
   void _updateEdgeItemsVisibility() {
     final bool shouldAutoHide =
-        widget.layoutMode == BubblePopupMenuLayoutMode.overlay &&
+        _layoutMode == BubblePopupMenuLayoutMode.overlay &&
             widget.autoHideEdgeItemsOnScroll;
     final bool shouldShow = !shouldAutoHide ||
         (!_isPopupScrolling &&
@@ -623,7 +700,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 使用 ScrollEndNotification 而不是手势抬起事件，因此惯性滚动和回弹阶段
   /// 也会持续保持隐藏，直到 ScrollPosition 真正稳定后才重新判断最终 offset。
   bool _handlePopupScrollNotification(ScrollNotification notification) {
-    if (widget.layoutMode != BubblePopupMenuLayoutMode.overlay ||
+    if (_layoutMode != BubblePopupMenuLayoutMode.overlay ||
         !widget.autoHideEdgeItemsOnScroll ||
         _translationHiding) {
       return false;
@@ -707,9 +784,14 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         return;
       }
 
-      ///展示之前的数据
+      ///展示之前的数据（保留本次 show 的 layoutMode / header 定位参数）
       if (_menuController._currentIsShow) {
-        _menuController.show(data: _menuController._currentData);
+        _menuController.show(
+          data: _menuController._currentData,
+          headerTranslate: _menuController.headerTranslate,
+          headerBottomGlobalY: _menuController.headerBottomGlobalY,
+          layoutMode: _menuController.layoutModeOverride,
+        );
       }
     });
   }
@@ -728,6 +810,12 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// recalculate translation begin offset for hide
   /// 在隐藏前根据最新 child 位置重新计算回退偏移
   void _refreshTranslationForHide() {
+    /// fixed 模式不做内容位移动画，隐藏时也无需回退偏移。
+    if (_layoutMode == BubblePopupMenuLayoutMode.fixed) {
+      _translationBeginOffset = Offset.zero;
+      return;
+    }
+
     ///在被弹出新界面覆盖的情况下，不做回位动画，因为pushRoute后这个位置可能很奇怪。
     if (widget.type == BubblePopupMenuType.layer) {
       final bool isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
@@ -1088,8 +1176,8 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       futureList.add(_translationController.forward());
     }
 
-    ///回退滚动动画（仅可滚动模式）
-    if (widget.layoutMode == BubblePopupMenuLayoutMode.scroll &&
+    ///回退滚动动画（仅可滚动模式；fixed 禁止滚动，无需复位）
+    if (_layoutMode == BubblePopupMenuLayoutMode.scroll &&
         _scrollController.hasClients) {
       futureList.add(
         _scrollController.animateTo(
@@ -1344,6 +1432,12 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     final Offset posLimit =
         constrainRectWithinRect(bigRect, totalRect, pos, showDown);
 
+    /// fixed：不做边界校正位移，内容锚定在 child 原始相对位置；
+    /// 其余模式仍使用边界内位置，并通过位移动画从原始位置过渡过去。
+    final bool disableContentTranslate =
+        _layoutMode == BubblePopupMenuLayoutMode.fixed;
+    final Offset showOffset = disableContentTranslate ? pos : posLimit;
+
     /// calculate bubble arrow delta
     /// 计算气泡箭头偏移
     final double delta;
@@ -1364,12 +1458,12 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     /// overlay 模式不改变原布局，仅把超出可视区的 menu 向 child 方向平移。
     final double overflowHeight = max(0, totalRect.height - bigRect.height);
     final double menuTranslateY =
-        widget.layoutMode == BubblePopupMenuLayoutMode.overlay
+        _layoutMode == BubblePopupMenuLayoutMode.overlay
             ? overflowHeight * (showDown ? -1 : 1)
             : 0;
 
-    final double showPosX = posLimit.dx;
-    final double showPosY = posLimit.dy;
+    final double showPosX = showOffset.dx;
+    final double showPosY = showOffset.dy;
 
     /// 开启 correctOverlayMaxScrollExtent 时，按 translate 后的视觉最底部
     /// 计算 overlay 模式的 maxScrollExtent。
@@ -1377,7 +1471,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     /// showDown 时 menu 会向上覆盖 child，不能直接从布局溢出中减去整个
     /// overflowHeight，否则 child 很高时上限会被错误压成 0，无法滚到 child
     /// 底部。这里分别计算未平移区域与已平移 menu 的视觉底边，取较大值。
-    if (widget.layoutMode == BubblePopupMenuLayoutMode.overlay &&
+    if (_layoutMode == BubblePopupMenuLayoutMode.overlay &&
         widget.correctOverlayMaxScrollExtent) {
       final double visualBottomInContent;
       if (showDown) {
@@ -1403,11 +1497,13 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     }
 
     /// translation animation offset
-    /// 平移动画的起始偏移
-    final Offset translationBeginOffset = Offset(
-      pos.dx - posLimit.dx,
-      pos.dy - posLimit.dy,
-    );
+    /// 平移动画的起始偏移；fixed 模式强制为 0，跳过内容位移。
+    final Offset translationBeginOffset = disableContentTranslate
+        ? Offset.zero
+        : Offset(
+            pos.dx - posLimit.dx,
+            pos.dy - posLimit.dy,
+          );
 
     /// update translation animation
     /// 更新平移动画
@@ -1446,22 +1542,26 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
             _menuController.data,
           )
         : const SizedBox.shrink();
+    Widget headerContent = AnimatedBuilder(
+      animation: _animationController.listenable,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _animationController.value,
+          child: child,
+        );
+      },
+      child: header,
+    );
+
+    /// header 位移改在 [_buildContentView] 用 Positioned 完成，
+    /// 避免 Transform.translate 移出布局盒后无法命中。
     return Offstage(
       offstage: _currentHeaderRect == null,
       child: UnconstrainedBox(
         child: Padding(
           key: _popupHeaderKey,
           padding: widget.headerPadding,
-          child: AnimatedBuilder(
-            animation: _animationController.listenable,
-            builder: (context, child) {
-              return Opacity(
-                opacity: _animationController.value,
-                child: child,
-              );
-            },
-            child: header,
-          ),
+          child: headerContent,
         ),
       ),
     );
@@ -1516,7 +1616,7 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 使用 [AnimatedOpacity] 而非 Offstage/条件移除，确保隐藏前后占位尺寸一致；
   /// 隐藏状态下通过 [IgnorePointer] 防止透明的功能项拦截点击。
   Widget _buildScrollAwareEdgeItem(Widget child) {
-    if (widget.layoutMode != BubblePopupMenuLayoutMode.overlay ||
+    if (_layoutMode != BubblePopupMenuLayoutMode.overlay ||
         !widget.autoHideEdgeItemsOnScroll) {
       return child;
     }
@@ -1588,31 +1688,84 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       ),
     );
 
-    ///子类
-    final List<Widget> children;
-    if (showDown) {
-      children = [
-        headerView,
-        childView,
-        menuView,
-      ];
-    } else {
-      children = [
-        menuView,
-        childView,
-        headerView,
-      ];
+    /// header + child：
+    /// - Column 占位保证 child 锚点不变；
+    /// - Stack + Positioned 把 header 放到目标位置（含 translate），
+    ///   布局盒落在视觉位置，避免 Transform 移出父盒后无法点击；
+    /// - Positioned 后绘制，header 自然盖在 child 之上。
+    final Offset headerTranslate = _resolvedHeaderTranslate;
+    final double headerSlotHeight = _currentHeaderRect?.height ?? 0;
+    final AlignmentGeometry headerAlign;
+    switch (widget.align) {
+      case BubblePopupMenuAlign.start:
+        headerAlign = Alignment.centerLeft;
+        break;
+      case BubblePopupMenuAlign.end:
+        headerAlign = Alignment.centerRight;
+        break;
+      case BubblePopupMenuAlign.center:
+        headerAlign = Alignment.center;
+        break;
     }
+
+    final Widget headerAndChild = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: crossAxisAlignment,
+          children: showDown
+              ? [
+                  SizedBox(height: headerSlotHeight),
+                  childView,
+                ]
+              : [
+                  childView,
+                  SizedBox(height: headerSlotHeight),
+                ],
+        ),
+        Positioned(
+          top: showDown ? headerTranslate.dy : null,
+          bottom: showDown ? null : -headerTranslate.dy,
+          left: 0,
+          right: 0,
+          child: Align(
+            alignment: headerAlign,
+            child: headerTranslate.dx == 0
+                ? headerView
+                : Transform.translate(
+                    offset: Offset(headerTranslate.dx, 0),
+                    child: headerView,
+                  ),
+          ),
+        ),
+      ],
+    );
+
+    final Widget columnContent = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: crossAxisAlignment,
+      children: showDown
+          ? [
+              headerAndChild,
+              menuView,
+            ]
+          : [
+              menuView,
+              headerAndChild,
+            ],
+    );
 
     /// 收起位移动画期间锁定滚动。
     /// overlay 模式仅在内容超出边界、menu 与 child 发生叠加时允许滚动回弹；
+    /// fixed 模式锚定位置，禁止滚动，避免拖动破坏固定锚点。
     /// 空间足够时禁用滚动，避免短内容仍可拖动。
     /// 是否额外收紧 maxScrollExtent 由 correctOverlayMaxScrollExtent 决定。
     final bool lockScroll = _translationHiding;
     final ScrollPhysics scrollPhysics;
-    if (lockScroll) {
+    if (lockScroll || _layoutMode == BubblePopupMenuLayoutMode.fixed) {
       scrollPhysics = const NeverScrollableScrollPhysics();
-    } else if (widget.layoutMode == BubblePopupMenuLayoutMode.overlay) {
+    } else if (_layoutMode == BubblePopupMenuLayoutMode.overlay) {
       scrollPhysics = allowOverlayScroll
           ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
           : const NeverScrollableScrollPhysics();
@@ -1622,6 +1775,17 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
     /// 通过 NotificationListener 记录完整滚动生命周期；controller listener
     /// 继续负责监听 offset，二者共同避免阈值附近反复显示/隐藏。
+    ///
+    /// Container.margin 不允许负值；fixed 模式下锚定位置可能越界（如靠近顶部），
+    /// 因此将负向部分拆到 Transform.translate，保留原始视觉锚点。
+    final double marginLeft = max(0, offset.dx);
+    final double marginTop = max(0, offset.dy);
+    final double marginRight = max(0, widget.boundaryPadding.right);
+    final double marginBottom = max(0, widget.boundaryPadding.bottom);
+    final Offset overflowTranslate = Offset(
+      min(0, offset.dx),
+      min(0, offset.dy),
+    );
     return NotificationListener<ScrollNotification>(
       onNotification: _handlePopupScrollNotification,
       child: SingleChildScrollView(
@@ -1631,26 +1795,20 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
         clipBehavior: Clip.none,
         child: Container(
           margin: EdgeInsets.fromLTRB(
-            offset.dx,
-            offset.dy,
-            //右边需要限制一下
-            widget.boundaryPadding.right,
-            //底部也需要限制一下
-            widget.boundaryPadding.bottom,
+            marginLeft,
+            marginTop,
+            marginRight,
+            marginBottom,
           ),
           child: AnimatedBuilder(
             animation: _translationAnimation,
             builder: (context, child) {
               return Transform.translate(
-                offset: _translationAnimation.value,
+                offset: _translationAnimation.value + overflowTranslate,
                 child: child,
               );
             },
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: crossAxisAlignment,
-              children: children,
-            ),
+            child: columnContent,
           ),
         ),
       ),
@@ -1661,6 +1819,15 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 更新平移动画
   void _updateTranslationAnimation(Offset newBeginOffset) {
     if (!mounted || _translationHiding) {
+      return;
+    }
+
+    /// fixed 模式禁用内容位移动画，始终保持零偏移。
+    if (_layoutMode == BubblePopupMenuLayoutMode.fixed) {
+      if (_translationBeginOffset != Offset.zero) {
+        _translationBeginOffset = Offset.zero;
+        _resetTranAnimation();
+      }
       return;
     }
     if (_translationBeginOffset == newBeginOffset) {

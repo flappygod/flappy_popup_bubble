@@ -490,8 +490,9 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// 1. layer show：先 insert OverlayEntry，列表仍持有 key；首帧后再置 true
   ///    （根 Overlay 先 build 列表再 build 新 Entry，过早置 true 会空一帧）
   /// 2. dialog show：可与 push 同时置 true（路由层交接更完整）
-  /// 3. hide 收尾：先置 false 并刷新弹层，卸掉 HeroMode 下的 keyed child
-  /// 4. 下一帧再 setState，把 key 归还给列表
+  /// 3. hide 收尾：先置 false，把 key 交回列表并刷新弹层占位；下一帧再卸 Overlay
+  ///    （若先卸 Overlay，列表仍是占位，回退结束会闪一帧空洞）
+  /// 4. 卸层后再 setState / onPopupHide
   ///
   /// 避免关闭后立刻 push 其他 route（如 EmojiTraySheet）时出现 Duplicate GlobalKey。
   bool _popupOwnsChildKey = false;
@@ -1026,6 +1027,21 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     }
   }
 
+  /// showChildTop：把 [_currentChildKey] 从弹层交回列表，弹层改为占位。
+  ///
+  /// BubbleDialogFrame 比列表 child 浅，会先 build 卸 key，随后列表接回，
+  /// 避免 Duplicate GlobalKey。调用后弹层仍在，下一帧再 [OverlayEntry.remove]。
+  void _releaseChildKeyToList() {
+    if (!widget.showChildTop || !_popupOwnsChildKey) {
+      return;
+    }
+    _popupOwnsChildKey = false;
+    _currentFrameController.refresh();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   ///直接展示dialog
   void _showDialog() {
     /// is already show
@@ -1219,12 +1235,6 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
 
   /// 移除 overlay / dialog 并复位业务状态（不操作 [AnimationController]）
   void _cleanupPopupShell() {
-    /// showChildTop：先释放弹层侧 GlobalKey，再卸 route；列表归还延后到下一帧
-    if (widget.showChildTop && _popupOwnsChildKey) {
-      _popupOwnsChildKey = false;
-      _currentFrameController.refresh();
-    }
-
     if (_isLayerShow) {
       _currentShowOverlay?.remove();
       _currentShowOverlay = null;
@@ -1281,28 +1291,35 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       return;
     }
     _isCleaningUp = true;
-    final bool deferChildReclaim = widget.showChildTop;
-    try {
-      _cleanupPopupShell();
-      _resetTranAnimation();
-      void finish() {
+
+    void finish() {
+      try {
+        _cleanupPopupShell();
+        _resetTranAnimation();
         if (mounted) {
           setState(() {});
         }
         widget.onPopupHide?.call();
+      } finally {
         _isCleaningUp = false;
       }
-
-      if (deferChildReclaim) {
-        /// 等本帧弹层卸载完成，再让列表挂回 [_currentChildKey]
-        WidgetsBinding.instance.addPostFrameCallback((_) => finish());
-      } else {
-        finish();
-      }
-    } catch (_) {
-      _isCleaningUp = false;
-      rethrow;
     }
+
+    /// showChildTop：必须先把 key 交回列表并画一帧，再卸 Overlay。
+    /// 若同帧 refresh(卸 key)+remove，列表仍是占位，回退结束会闪空洞。
+    if (widget.showChildTop && _popupOwnsChildKey) {
+      _releaseChildKeyToList();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          _isCleaningUp = false;
+          return;
+        }
+        finish();
+      });
+      return;
+    }
+
+    finish();
   }
 
   /// divider height

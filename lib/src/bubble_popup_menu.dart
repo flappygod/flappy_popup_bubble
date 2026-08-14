@@ -487,9 +487,11 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// showChildTop 时，[_currentChildKey] 当前是否挂在弹层侧。
   ///
   /// 生命周期：
-  /// 1. show：置 true，child 从列表 reparent 到弹层
-  /// 2. hide 收尾：先置 false 并刷新弹层，卸掉 HeroMode 下的 keyed child
-  /// 3. 下一帧再 setState，把 key 归还给列表
+  /// 1. layer show：先 insert OverlayEntry，列表仍持有 key；首帧后再置 true
+  ///    （根 Overlay 先 build 列表再 build 新 Entry，过早置 true 会空一帧）
+  /// 2. dialog show：可与 push 同时置 true（路由层交接更完整）
+  /// 3. hide 收尾：先置 false 并刷新弹层，卸掉 HeroMode 下的 keyed child
+  /// 4. 下一帧再 setState，把 key 归还给列表
   ///
   /// 避免关闭后立刻 push 其他 route（如 EmojiTraySheet）时出现 Duplicate GlobalKey。
   bool _popupOwnsChildKey = false;
@@ -752,7 +754,8 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
   /// build child
   /// 构建 child
   Widget _buildBaseChild() {
-    if (widget.showChildTop && (_isLayerShow || _isDialogShow)) {
+    /// 仅当弹层已经持有 GlobalKey 时才掏空列表，避免 layer 首帧出现空洞。
+    if (widget.showChildTop && _popupOwnsChildKey) {
       return SizedBox(
         width: _currentChildRect.width,
         height: _currentChildRect.height,
@@ -970,14 +973,9 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
     );
     _translationController.reset();
 
-    /// 展示弹层；showChildTop 时由弹层持有 [_currentChildKey]
+    /// 展示弹层。showChildTop 时不要在 insert 前抢 GlobalKey：
+    /// 根 Overlay 从下往上 build，列表 Entry 先于本 Entry，抢 key 会先画出空洞。
     _isLayerShow = true;
-    if (widget.showChildTop) {
-      _popupOwnsChildKey = true;
-    }
-    if (mounted) {
-      setState(() {});
-    }
 
     /// show overlay later
     /// 插入 overlay
@@ -992,6 +990,11 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
           child: BubbleDialogFrame(
             controller: _currentFrameController,
             onFirstFrame: () {
+              /// 弹层已在树上：再把 key 交给弹层。
+              /// BubbleDialogFrame 比列表 child 浅，会先 build 并偷走 GlobalKey，
+              /// 随后列表 setState 改成占位，避免 Duplicate GlobalKey 与首帧空洞。
+              _claimChildKeyForPopup();
+
               ///展示动画并计算高度
               _animationController.show();
               _animationHoverController.show();
@@ -1009,6 +1012,18 @@ class _BubblePopupMenuState<T> extends State<BubblePopupMenu<T>>
       },
     );
     overlay.insert(_currentShowOverlay!);
+  }
+
+  /// showChildTop：把 [_currentChildKey] 从列表交给已挂载的弹层。
+  void _claimChildKeyForPopup() {
+    if (!widget.showChildTop || _popupOwnsChildKey) {
+      return;
+    }
+    _popupOwnsChildKey = true;
+    _currentFrameController.refresh();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   ///直接展示dialog

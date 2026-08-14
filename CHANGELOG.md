@@ -1,3 +1,4 @@
-## 2.0.4
+## 2.0.5
 
-1. Add BubblePopupMenuLayoutMode.fixed feature.
+1. Fix showChildTop flicker on BubblePopupMenuType.layer: claim GlobalKey after OverlayEntry first frame.
+
